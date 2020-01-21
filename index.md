@@ -1,6 +1,4 @@
-<!DOCTYPE HTML>
 <!-- saved from url=(0037)http://webdocs.cs.ualberta.ca/~jwen4/ -->
-<!DOCTYPE html PUBLIC "" ""><!--Boundary padding.--><!--http://www.w3schools.com/css/css_boxmodel.asp--><HTML><HEAD><META
 content="IE=11.0000" http-equiv="X-UA-Compatible">
      <LINK href="Fei%20Tian's%20Homepage_files/style.css" rel="stylesheet"
 type="text/css">
