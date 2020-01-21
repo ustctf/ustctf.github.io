@@ -1,5 +1,4 @@
 <!-- saved from url=(0037)http://webdocs.cs.ualberta.ca/~jwen4/ -->
-content="IE=11.0000" http-equiv="X-UA-Compatible">
      <LINK href="Fei%20Tian's%20Homepage_files/style.css" rel="stylesheet"
 type="text/css">
 <META http-equiv="Content-Type"
