@@ -81,9 +81,11 @@ h2 { margin: 0; font-family: var(--serif); font-size: clamp(2rem, 4vw, 3rem); li
 .experience-copy { max-width: 760px; }
 .experience-copy > p { margin: 0 0 14px; }
 .experience-copy .experience-impact { margin-top: 20px; margin-bottom: 0; }
+.experience-copy .experience-note { margin-top: 20px; margin-bottom: 0; }
 .plain-enumeration { margin: 10px 0 0; padding-left: 25px; }
 .plain-enumeration li { margin-bottom: 10px; padding-left: 5px; }
 .plain-enumeration li::marker { color: var(--blue); font-weight: 700; }
+.venue { color: var(--muted); font-size: 0.9em; white-space: nowrap; }
 
 .compact-heading { align-items: center; }
 .scholar-note { margin: 0; }
@@ -94,9 +96,7 @@ h2 { margin: 0; font-family: var(--serif); font-size: clamp(2rem, 4vw, 3rem); li
 .education-list .degree { margin-bottom: 8px; font-family: var(--serif); font-size: 18px; font-weight: 600; }
 .education-list span { color: var(--muted); font-size: 13px; }
 
-.beliefs { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; }
-.beliefs h2 { font-size: 24px; }
-.belief-list { max-width: 760px; margin: 0; padding-left: 25px; }
+.belief-list { max-width: 890px; margin: 0; padding-left: 25px; }
 .belief-list li { margin-bottom: 18px; padding-left: 5px; }
 .belief-list li:last-child { margin-bottom: 0; }
 .belief-list li::marker { color: var(--blue); font-weight: 700; }
@@ -120,8 +120,8 @@ footer { background: #f3f4f5; }
   .intro-heading { margin-bottom: 24px; }
   .intro-content { grid-template-columns: 1fr; gap: 28px; }
   .portrait { max-width: 420px; }
-  .education-list, .beliefs, .experience-entry { grid-template-columns: 1fr; }
-  .beliefs, .experience-entry { gap: 16px; }
+  .education-list, .experience-entry { grid-template-columns: 1fr; }
+  .experience-entry { gap: 16px; }
 }
 
 @media (max-width: 500px) {
