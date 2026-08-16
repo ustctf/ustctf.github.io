@@ -1,0 +1,142 @@
+:root {
+  --text: #202124;
+  --muted: #5f6368;
+  --blue: #2457a6;
+  --blue-dark: #173e78;
+  --paper: #fbfbfa;
+  --white: #ffffff;
+  --line: #dfe2e6;
+  --soft-line: #eceef0;
+  --max-width: 1060px;
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+
+body {
+  margin: 0;
+  color: var(--text);
+  background: var(--paper);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.68;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--blue); text-underline-offset: 3px; }
+a:hover { color: var(--blue-dark); }
+img { display: block; max-width: 100%; }
+
+.container { width: min(var(--max-width), calc(100% - 44px)); margin: 0 auto; }
+
+.skip-link {
+  position: fixed;
+  z-index: 20;
+  top: 8px;
+  left: 8px;
+  padding: 8px 12px;
+  color: var(--white);
+  background: var(--blue-dark);
+  transform: translateY(-150%);
+}
+.skip-link:focus { transform: translateY(0); }
+
+.site-header {
+  position: sticky;
+  z-index: 10;
+  top: 0;
+  border-bottom: 1px solid var(--line);
+  background: rgba(251, 251, 250, 0.96);
+  backdrop-filter: blur(10px);
+}
+
+.header-inner { display: flex; align-items: center; justify-content: space-between; min-height: 64px; gap: 28px; }
+.site-name { color: var(--text); font-family: var(--serif); font-size: 20px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+nav { display: flex; align-items: center; gap: 25px; }
+nav a { color: var(--muted); font-size: 13px; font-weight: 600; text-decoration: none; }
+nav a:hover { color: var(--blue); }
+
+.intro { padding-top: 66px; padding-bottom: 82px; }
+.intro-heading { margin-bottom: 30px; }
+.intro-content { display: grid; grid-template-columns: minmax(330px, 380px) minmax(0, 1fr); gap: 54px; align-items: start; }
+.portrait { margin: 0; }
+.portrait img { width: 100%; height: auto; aspect-ratio: 1.15 / 1; border: 1px solid var(--line); border-radius: 5px; object-fit: cover; object-position: 55% center; }
+h1, h2, h3 { color: #17191c; }
+h1 { margin: 0; font-family: var(--serif); font-size: clamp(2.7rem, 6vw, 4.1rem); line-height: 1.05; font-weight: 600; }
+.intro-copy { padding-top: 2px; }
+.intro-copy > p { max-width: 650px; margin: 0 0 16px; }
+.intro-copy .lead { margin-bottom: 16px; }
+.profile-links { display: flex; gap: 20px; margin-top: 25px; }
+.profile-links a { font-size: 14px; font-weight: 600; }
+
+.experience, .publications, .education, .beliefs { padding-top: 74px; padding-bottom: 80px; border-top: 1px solid var(--line); }
+.section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 30px; margin-bottom: 36px; }
+h2 { margin: 0; font-family: var(--serif); font-size: clamp(2rem, 4vw, 3rem); line-height: 1.18; font-weight: 600; }
+.experience-entry { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; padding: 32px 0 34px; border-top: 1px solid var(--soft-line); }
+.experience-entry:last-child { padding-bottom: 0; }
+.experience-meta h3 { margin: 0 0 4px; font-family: var(--serif); font-size: 19px; line-height: 1.35; }
+.experience-meta p { margin: 0; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.experience-copy { max-width: 760px; }
+.experience-copy > p { margin: 0 0 14px; }
+.experience-copy .experience-impact { margin-top: 20px; margin-bottom: 0; }
+.plain-enumeration { margin: 10px 0 0; padding-left: 25px; }
+.plain-enumeration li { margin-bottom: 10px; padding-left: 5px; }
+.plain-enumeration li::marker { color: var(--blue); font-weight: 700; }
+
+.compact-heading { align-items: center; }
+.scholar-note { margin: 0; }
+
+.education-list { display: grid; grid-template-columns: 1fr 1fr; gap: 35px; }
+.education-list article { padding-top: 19px; border-top: 2px solid var(--blue); }
+.education-list p { margin: 0; }
+.education-list .degree { margin-bottom: 8px; font-family: var(--serif); font-size: 18px; font-weight: 600; }
+.education-list span { color: var(--muted); font-size: 13px; }
+
+.beliefs { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; }
+.beliefs h2 { font-size: 24px; }
+.belief-list { max-width: 760px; margin: 0; padding-left: 25px; }
+.belief-list li { margin-bottom: 18px; padding-left: 5px; }
+.belief-list li:last-child { margin-bottom: 0; }
+.belief-list li::marker { color: var(--blue); font-weight: 700; }
+
+footer { background: #f3f4f5; }
+.footer-inner { display: flex; align-items: center; justify-content: space-between; min-height: 92px; gap: 30px; color: var(--muted); font-size: 12px; }
+.footer-inner p { margin: 0; }
+.footer-inner div { display: flex; gap: 20px; }
+.footer-inner a { text-decoration: none; }
+
+@media (max-width: 900px) {
+  .intro-content { grid-template-columns: minmax(280px, 320px) minmax(0, 1fr); gap: 38px; }
+}
+
+@media (max-width: 800px) {
+  html { scroll-padding-top: 118px; }
+  .header-inner { align-items: flex-start; flex-direction: column; gap: 8px; padding: 13px 0 11px; }
+  nav { width: 100%; gap: 18px; overflow-x: auto; padding-bottom: 2px; }
+  nav a { white-space: nowrap; }
+  .intro { padding-top: 46px; padding-bottom: 62px; }
+  .intro-heading { margin-bottom: 24px; }
+  .intro-content { grid-template-columns: 1fr; gap: 28px; }
+  .portrait { max-width: 420px; }
+  .education-list, .beliefs, .experience-entry { grid-template-columns: 1fr; }
+  .beliefs, .experience-entry { gap: 16px; }
+}
+
+@media (max-width: 500px) {
+  .container { width: min(var(--max-width), calc(100% - 30px)); }
+  body { font-size: 15px; }
+  .site-name { font-size: 18px; }
+  nav { justify-content: space-between; gap: 10px; }
+  nav a { font-size: 12px; }
+  .portrait img { width: 100%; height: auto; aspect-ratio: 1.35 / 1; object-position: 55% 46%; }
+  .profile-links { flex-wrap: wrap; }
+  .section-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .experience, .publications, .education, .beliefs { padding-top: 58px; padding-bottom: 64px; }
+  .footer-inner { align-items: flex-start; flex-direction: column; justify-content: center; gap: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
