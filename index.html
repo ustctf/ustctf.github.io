@@ -42,6 +42,7 @@
           <div class="profile-links" aria-label="Profile links">
             <a href="https://scholar.google.com/citations?user=SZbCPDEAAAAJ" target="_blank" rel="noreferrer">Google Scholar</a>
             <a href="https://www.linkedin.com/in/fei-tian-ustc-ml" target="_blank" rel="noreferrer">LinkedIn</a>
+            <a href="mailto:" data-contact="email" aria-label="Email Fei Tian">Email</a>
           </div>
         </div>
       </div>
@@ -129,6 +130,15 @@
       <div><a href="https://scholar.google.com/citations?user=SZbCPDEAAAAJ" target="_blank" rel="noreferrer">Scholar</a><a href="https://www.linkedin.com/in/fei-tian-ustc-ml" target="_blank" rel="noreferrer">LinkedIn</a></div>
     </div>
   </footer>
+
+  <script>
+    (() => {
+      const address = String.fromCharCode(102, 101, 105, 116, 105, 97, 110, 46, 117, 115, 116, 99, 64, 103, 109, 97, 105, 108, 46, 99, 111, 109);
+      document.querySelectorAll('[data-contact="email"]').forEach((link) => {
+        link.href = `mailto:${address}`;
+      });
+    })();
+  </script>
 
   <!-- Cloudflare Web Analytics -->
   <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"fc04a46edad14ccebbbe4f9968b90908"}'></script>
