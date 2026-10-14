@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Two comments people new to RL post-training often make, “RL is just weighted SFT” and “the loss function means nothing,” and the one fact that clears up both.">
+  <meta name="author" content="Fei Tian">
+  <title>Two Things RL Beginners Get Confused About · Fei Tian</title>
+  <link rel="stylesheet" href="../../styles.css?v=20261014">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
+  <link rel="stylesheet" href="../blog.css?v=20261014">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      renderMathInElement(document.querySelector('.post-body'), {
+        delimiters: [
+          { left: '\\[', right: '\\]', display: true },
+          { left: '\\(', right: '\\)', display: false },
+        ],
+        macros: {
+          '\\E': '\\mathbb{E}',
+          '\\KL': '\\mathrm{KL}',
+          '\\old': '\\mathrm{old}',
+          '\\base': '\\mathrm{base}',
+          '\\dist': '\\mathrm{dist}',
+        },
+        throwOnError: false,
+      });
+    });
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="site-name" href="../../">Fei Tian's Homepage</a>
+      <nav aria-label="Primary navigation">
+        <a href="../../#about">About</a>
+        <a href="../../#experience">Experience</a>
+        <a href="../../#publications">Publications</a>
+        <a href="../../#blogs">Blogs</a>
+        <a href="../../#education">Education</a>
+        <a href="../../#beliefs">Beliefs</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <article class="post">
+      <header class="post-header">
+        <h1>Two Things RL Beginners Get Confused About</h1>
+        <p class="post-subtitle">and the one fact that clears up both</p>
+        <p class="post-meta">Fei Tian with Claude<span class="sep">·</span>October 2026<!-- <span class="sep">·</span><a href="FULL-VERSION-URL">full version with all derivations</a> --></p>
+      </header>
+
+      <div class="post-body">
+        <p>Over the past few months I have had a lot of technical discussions with colleagues who are ramping up on RL for LLM post-training. Most of them come from a supervised-learning background, and two comments from those conversations stuck with me, because each one is correct about the math on the page and still leads to the wrong picture of what RL does. I ended up digging into both much more deeply than I expected. Since they are probably common among people new to RL, I am writing them down here.</p>
+
+        <p><strong>Comment 1: “RL is just weighted SFT.”</strong> This came from a colleague who had just worked through a policy-gradient derivation. The SFT loss and the REINFORCE loss, as you would write them in code, look like this:</p>
+        <div class="eq-pair">
+          \[\mathcal{L}_{\mathrm{SFT}}=-\frac{1}{N}\sum_{i=1}^{N}\log\pi_\theta(y_i),\qquad y_i\sim\text{dataset};\]
+          \[\mathcal{L}_{\mathrm{RL}}=-\frac{1}{N}\sum_{i=1}^{N}R(y_i)\,\log\pi_\theta(y_i),\qquad y_i\sim\pi_\theta .\]
+        </div>
+        <p>His reading: “The only difference is the \(R(y_i)\) in front. You sample from the model, pretend the samples are labels, and weight each one by its reward. It’s SFT with a multiplier.” He was right about the math, and that is exactly what makes the comment hard to answer.</p>
+
+        <p><strong>Comment 2: “The loss function means nothing.”</strong> This came from a colleague reading OpenAI’s Spinning Up, where the same \(\mathcal{L}_{\mathrm{RL}}\) is introduced together with a warning box<a class="footnote-ref" href="#fn1" id="fnref1"><sup>1</sup></a> that says, among other things:</p>
+        <blockquote class="quote-box">
+          <p>“Even though we describe this as a loss function, it is <strong>not</strong> a loss function in the typical sense from supervised learning. […] It doesn’t measure performance. […] After that first step of gradient descent, there is no more connection to performance. This means that minimizing this ‘loss’ function, for a given batch of data, has <em>no</em> guarantee whatsoever of improving expected return. You can send this loss to \(-\infty\) and policy performance could crater; in fact, it usually will. […] The loss function means nothing.”</p>
+        </blockquote>
+        <p>She found this confusing rather than clarifying, and I think her questions were the right ones:</p>
+        <ul class="question-list">
+          <li><a href="#what-the-loss-is">If the loss means nothing, why do we minimize it?</a></li>
+          <li><a href="#first-step">If it has the right gradient, what exactly goes wrong after the first step?</a></li>
+          <li><a href="#how-far">And how far is too far?</a></li>
+        </ul>
+        <p>Put the two comments side by side and there is already something odd. The first says \(\mathcal{L}_{\mathrm{RL}}\) is just SFT with a weight, so surely it behaves like a loss. The second says it is not a loss at all. Both are about the same two lines of code. They look unrelated, but they turn out to be two sides of the same fact, and once you see that fact both of them resolve at once. This post works through them in a world small enough that everything can be computed by hand.</p>
+
+        <h2 id="three-answers">A world with three answers</h2>
+        <p>There is one prompt, and the model can answer it in only three ways:</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>answer</th><th>what it is</th><th class="num">reward \(R\)</th><th class="num">base model \(\pi_\base\)</th><th class="num">SFT demos \(p\)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="ans ans-a">A</td><td>the best answer</td><td class="num">\(1.0\)</td><td class="num">\(0.1\)</td><td class="num">\(0.5\)</td></tr>
+              <tr><td class="ans ans-b">B</td><td>an acceptable answer</td><td class="num">\(0.6\)</td><td class="num">\(0.6\)</td><td class="num">\(0.5\)</td></tr>
+              <tr><td class="ans ans-c">C</td><td>a wrong answer</td><td class="num">\(0.0\)</td><td class="num">\(0.3\)</td><td class="num">\(0\)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>A policy is a distribution \(\pi=(\pi_A,\pi_B,\pi_C)\), produced by a softmax over three logits, which are the parameters we train. The base model is \(\pi_\base=(0.1,\,0.6,\,0.3)\): it usually says B, sometimes C, and rarely produces the best answer. This is the realistic case: if the base model already gave the best answer most of the time, there would be little left to train.</p>
+        <p>SFT is given demonstrations, say \(p=(0.5,0.5,0)\), and maximizes their log-likelihood. RL is given the reward table and maximizes the expected reward of the model’s own answers:</p>
+        <div class="eq-pair">
+          \[J_{\mathrm{SFT}}=\sum_k p_k\log\pi_k=\E_{a\sim p}[\log\pi(a)],\]
+          \[J_{\mathrm{RL}}=\sum_k \pi_k R_k=\E_{a\sim\pi}[R(a)] .\]
+        </div>
+        <p>Keep an eye on what sits under each expectation: in SFT a fixed \(p\), in RL the very \(\pi\) we are training. <strong>Everything in this post follows from that one difference.</strong></p>
+
+        <h2 id="part-1">Part 1: Comment 1, “RL is just weighted SFT”</h2>
+        <p>The logic of this part is short enough to state up front. Per sample, Comment 1 is right. But a loss is an average over samples, and the two losses average over different things: SFT over a fixed dataset, RL over the model’s own outputs. Once you take that average, the two gradients have different forms, and the different forms produce different behavior. The rest of this part fills in each step.</p>
+
+        <h3>Step 1: per sample, the comment is right</h3>
+        <p>Take one sampled answer \(y\) and differentiate its term in each loss:</p>
+        <div class="eq-pair">
+          \[\nabla_\theta\big[-\log\pi_\theta(y)\big]=-\nabla_\theta\log\pi_\theta(y),\]
+          \[\nabla_\theta\big[-R(y)\log\pi_\theta(y)\big]=-R(y)\,\nabla_\theta\log\pi_\theta(y).\]
+        </div>
+        <p>Same vector, scaled by \(R(y)\). The RL update pushes up the log-probability of the sampled answer exactly as SFT pushes up the log-probability of a label, only harder or softer depending on the reward. <strong>At the level of a single sample, Comment 1 is simply correct.</strong></p>
+
+        <h3>Step 2: a loss is an average, and the averages run over different things</h3>
+        <p>But nobody trains on one sample. The loss is an average over a batch, in the limit an expectation, so the gradient that actually moves the parameters is</p>
+        <div class="eq-pair">
+          \[\nabla J_{\mathrm{SFT}}=\E_{y\sim p}\big[\nabla\log\pi_\theta(y)\big],\]
+          \[\nabla J_{\mathrm{RL}}=\E_{y\sim\pi_\theta}\big[R(y)\,\nabla\log\pi_\theta(y)\big].\]
+        </div>
+        <p>In SFT the samples come from the dataset \(p\), which does not care what \(\theta\) is. In RL they come from \(\pi_\theta\) itself, so <em>how often each answer appears in the average</em> depends on the model being trained. Per sample this difference is invisible; in expectation it decides everything, and the three-answer world is small enough to see how.</p>
+        <p>The softmax gives \(\partial\log\pi_i/\partial\theta_k=\delta_{ik}-\pi_k\), where \(\delta_{ik}\) is \(1\) if \(i=k\) and \(0\) otherwise: raising one logit raises its own probability and lowers everyone else’s in proportion to their current size. Averaging over \(y\sim p\) for SFT and over \(y\sim\pi\) for RL,</p>
+        <div class="eq-pair">
+          \[\frac{\partial J_{\mathrm{SFT}}}{\partial\theta_k}=\sum_i p_i(\delta_{ik}-\pi_k)=p_k-\pi_k,\]
+          \[\frac{\partial J_{\mathrm{RL}}}{\partial\theta_k}=\sum_i \pi_i R_i(\delta_{ik}-\pi_k)=\pi_k\,(R_k-\bar R),\]
+        </div>
+        <p>with \(\bar R=\sum_i\pi_iR_i\) the current expected reward. Writing \(\dot\theta_k\) for the rate at which logit \(k\) moves under gradient ascent with a small step, the two update rules are</p>
+        <div class="eq-pair eq-numbered eq-key" id="eq-rules">
+          \[\text{SFT:}\quad \dot\theta_k=p_k-\pi_k\]
+          \[\text{RL:}\quad \dot\theta_k=\pi_k\,(R_k-\bar R).\]
+          <span class="eq-tag">(1)</span>
+        </div>
+        <p>Look at where the \(\pi_k\) in the RL rule comes from. The per-sample update for answer \(k\) has no \(\pi_k\) in front of it; if anything, a rare answer gets a <em>bigger</em> push when it is drawn, because of the \((1-\pi_k)\) on its own logit. <strong>The \(\pi_k\) is how often answer \(k\) shows up in the batch, which is how likely the model already is to produce it.</strong> In SFT the corresponding factor is \(p_k\), fixed by the dataset. The \(\bar R\) was not subtracted by hand either; it comes out of the softmax normalizer, and it means an answer is pushed up or down according to whether it beats the model’s <em>own current average</em>, not its absolute reward.</p>
+
+        <h3>Step 3: reading the two rules</h3>
+        <p>The SFT rule says: move each logit toward its target, with a force equal to the gap between where the probability is and where it should be. An answer the model never produces but the demonstrations contain gets a full-size push. <strong>SFT can put mass where there is none.</strong></p>
+        <p>The RL rule says: move each logit in proportion to two things, how much better than average the answer is (\(R_k-\bar R\)) and how likely the model already is to produce it (\(\pi_k\)). A rare answer barely moves, no matter how good it is; a common answer moves fast. <strong>RL can only redistribute mass among answers it already produces.</strong> In plain English: rich get richer. (Biologists will recognize the form of the replicator equation, \(\dot\pi_k=\pi_k(R_k-\bar R)\). That equation moves probabilities, though; ours moves logits, which turns out to be even more rich-get-richer.)</p>
+        <p>Where does each rule stop? SFT stops when \(\pi=p\): the gaps are all zero and the model has <strong>matched the demonstrations</strong>, A half the time and B half the time, even though A is strictly better. RL stops when \(\pi_k(R_k-\bar R)=0\) for every \(k\): every answer that still has probability must have reward equal to the average, which can only happen when all the probability sits on the best answer (or, if several tie for best, on those). You can see the same thing without calculus: \(J_{\mathrm{RL}}=\pi_A\cdot1.0+\pi_B\cdot0.6+\pi_C\cdot0\) is a weighted average of the rewards, and a weighted average is largest when all the weight sits on the largest term. From the base model, \(J=0.46\), move a tenth of the mass from C to A and get \(0.56\); nothing stops you until the corner \((1,0,0)\). <strong>SFT ends by matching a distribution; RL ends by committing to the best answer</strong> (<a href="#fig-simplex">Figure 1</a>).</p>
+
+        <figure id="fig-simplex">
+          <a href="figs/fig1_simplex_objectives.svg?v=20261014"><img src="figs/fig1_simplex_objectives.svg?v=20261014" width="540" height="318" alt="Two triangles of all policies over answers A, B and C. Left, the SFT objective: curved level sets with the maximum at the demonstration distribution p, on the edge between A and B. Right, the RL objective: straight parallel level sets with the maximum at corner A."></a>
+          <figcaption><b>Figure 1:</b> Both objectives drawn over the triangle of all policies (corners = deterministic policies). SFT climbs a curved hill whose top is \(p\); RL climbs a tilted plane whose top is a corner.</figcaption>
+        </figure>
+
+        <h3>Step 4: the path, not just the endpoint</h3>
+        <p><a href="#fig-dynamics">Figure 2</a> runs both rules from the base model, and the middle panel is the one to look at. RL does not head straight for A. It first drives C out and piles the mass onto B, the acceptable answer it was already producing; A barely moves because \(\pi_A\) is small. Only after C is gone does A start to grow, slowly, at a rate set by its own small probability. <strong>The rare good answer is exactly the one RL is slow to find.</strong> In the right panel, where A and B are equally correct, RL does not cover them; it concentrates on B, the one it already liked, because while C is pushed out the two good answers grow in proportion to their current size.</p>
+
+        <figure id="fig-dynamics">
+          <a href="figs/fig2_dynamics.svg?v=20261014"><img src="figs/fig2_dynamics.svg?v=20261014" width="622" height="421" alt="Three trajectories on the policy triangle with the probability of A, B and C over time below each. SFT settles at half A, half B. RL with reward (1, 0.6, 0) first rises toward B, then turns to A, ending near A. RL with binary reward (1, 1, 0) ends almost entirely on B."></a>
+          <figcaption><b>Figure 2:</b> Gradient ascent from the base model \((0.1,0.6,0.3)\) under the two rules in <a href="#eq-rules">(1)</a>. <b>Left:</b> SFT settles at the demos. <b>Middle:</b> RL first sharpens onto B, the common acceptable answer, and only slowly discovers the rare best answer A. <b>Right:</b> with a binary reward where A and B are both correct, RL concentrates on B, the one it already preferred; A shrinks to 3%.</figcaption>
+        </figure>
+
+        <aside class="takeaway">
+          <p class="takeaway-title">So, is RL weighted SFT?</p>
+          <p><strong>Per sample, yes. In expectation, no.</strong> The expectation is taken over the model’s own outputs, which puts \(\pi_k\), how likely the model already is to produce an answer, in front of every update, and centers the weights on the model’s own average reward. Both push toward sharpening rather than covering: RL amplifies what it already does well, cannot reach what it never samples, and among equally good answers favors the one it already prefers. One more difference remains: the batch is thrown away after each step, so there is no fixed dataset to converge to. That is <a href="#part-2">Part 2</a>.</p>
+        </aside>
+
+        <h2 id="part-2">Part 2: Comment 2, “The loss function means nothing”</h2>
+
+        <h3 id="what-the-loss-is">What the loss is, and is not</h3>
+        <p>Here is the REINFORCE loss as written in code. Samples \(a_i\) are drawn from the current policy \(\pi_\old\), and each gets an <em>advantage</em> \(A_i=R(a_i)-\bar R_\old\): its reward minus the old policy’s average (no relation to answer A). Advantages average to zero under \(\pi_\old\). Subtracting the average leaves the expected gradient unchanged, which is why \(\bar R\) showed up in <a href=\"#eq-rules\">(1)</a> on its own, but it makes each sample’s push less noisy. Then:</p>
+<pre><code>logp = log_prob(model, a_i)              <span class="c"># log pi_theta(a_i)</span>
+loss = -(A_i.detach() * logp).mean()     <span class="c"># gradient flows through logp only</span></code></pre>
+        <p>As a function of \(\theta\) with the batch frozen, this loss is \(-\tilde g(\theta)\), where</p>
+        \[\tilde g(\theta)=\E_{a\sim\pi_\old}\big[A(a)\log\pi_\theta(a)\big].\]
+        <p>Two facts about this function are all you need, and together they are what the warning box in Comment 2 is saying:</p>
+        <ol class="post-list">
+          <li>Its gradient at \(\theta=\theta_\old\) is \(\E_{a\sim\pi_\old}[A(a)\nabla\log\pi_\old(a)]=\nabla J_{\mathrm{RL}}(\theta_\old)\), the true policy gradient. That is the reason the loss is written this way.</li>
+          <li>That is the only thing it does. The value of \(\tilde g\) is not the expected reward, nor an estimate of it. It is linear in \(\log\pi_\theta\) and so unbounded: push \(\log\pi_\theta(a)\to-\infty\) for any sample with negative advantage and the “loss” improves forever, while the true return is bounded by the largest reward.</li>
+        </ol>
+        <p>So the answer to “why minimize something that means nothing” is that we don’t. <strong>We take its gradient at one point, where the gradient is right, and we never look at its value.</strong> It is a <em>surrogate</em>: a function built to have the correct slope at \(\theta_\old\) and nothing more. <strong>In SFT the loss and the objective are the same function. In RL they only share a slope, and only at one point.</strong></p>
+
+        <h3 id="first-step">What goes wrong after the first step</h3>
+        <p>Suppose you ignore this and treat \(\tilde g\) as a loss anyway: collect a batch from \(\pi_\old=\pi_\base\) and keep taking gradient steps on it. To rule out sampling noise as the explanation, let the batch be infinitely large, so that everything below is an exact expectation.</p>
+
+        <figure id="fig-batch">
+          <a href="figs/fig6_batch_reuse.svg?v=20261014"><img src="figs/fig6_batch_reuse.svg?v=20261014" width="550" height="288" alt="Left: true return over 80 gradient steps. Resampling every step climbs to about 0.99; a fixed batch peaks near 0.63 and settles at 0.61; a fixed batch with PPO-style clipping levels off near 0.56. Right: for the fixed-batch run, the change in its loss grows in a straight line while the change in true return flattens after about twenty steps."></a>
+          <figcaption><b>Figure 3:</b> Optimizing on one batch drawn from the base model. <b>Left:</b> true return. Keep stepping on the same batch and the policy converges onto B (return 0.61); clip PPO-style and it moves a little, then freezes (once every answer’s probability has moved more than 20% in the direction its advantage points, every sample is clipped and the gradient is zero, which is the cue to draw a new batch); resample every step and it finds A. <b>Right:</b> the fixed-batch run seen two ways: its loss reports steady improvement forever while its true return stopped after twenty steps.</figcaption>
+        </figure>
+
+        <p>The fixed-batch run in <a href="#fig-batch">Figure 3</a> is what the warning box describes. Its loss goes down at a constant rate, step after step. Its true return rises for twenty steps, to \(0.63\), then slides to \(0.61\) and stays: the model has converged onto B, the acceptable answer, and will never leave. The reason takes one line to see. The gradient of the frozen-batch loss with respect to the logits is</p>
+        \[\frac{\partial\tilde g}{\partial\theta_k}=\sum_i\pi_{\old,i}A_i(\delta_{ik}-\pi_k)=\pi_{\old,k}A_k-\pi_k\underbrace{\textstyle\sum_i\pi_{\old,i}A_i}_{=0}=\pi_{\old,k}A_k ,\]
+        <p><strong>a constant vector that does not depend on \(\theta\) at all.</strong> Gradient steps on a fixed batch walk in a fixed direction forever, and the direction favors whichever answer had the largest \(\pi_{\old,k}A_k\) <em>when the batch was drawn</em>: \(0.6\times0.14=0.084\) for B, against \(0.1\times0.54=0.054\) for A. B wins because it was common then, and nothing in the batch can ever say otherwise.</p>
+        <p>Compare with the true rule from Part 1, \(\pi_k(R_k-\bar R)\): the same expression, but with \(\pi\) and \(\bar R\) <em>updated as the policy moves</em>. If you resample, \(\pi_A\) grows, so A’s push grows, and A eventually wins. If you do not, the sampling factor stays frozen at \(\pi_\old\). This is where Comment 1 and Comment 2 meet: <strong>the factor \(\pi_k\) that makes RL sharpen in Part 1 is the same factor that, left frozen, makes the loss lie in Part 2.</strong></p>
+
+        <h3 id="how-far">How far is too far: the TRPO bound</h3>
+        <p>The warning box says the loss has “no connection to performance” after the first step. That is too strong, and my colleague was right to be bothered by it. There is a connection. It just weakens with distance, and the rate at which it weakens is known.</p>
+        <p>To state it, switch to the ratio form of the surrogate, which is what PPO (Proximal Policy Optimization) and TRPO (Trust Region Policy Optimization) use: \(g(\theta)=J(\theta_\old)+\E_{a\sim\pi_\old}[A(a)\,\pi_\theta(a)/\pi_\old(a)]\). It has the same gradient at \(\theta_\old\) as \(\tilde g\), but instead of a log it is an importance-sampling estimate: each old sample is reweighted by how much more or less likely the new policy is to produce it.</p>
+        <p>That reweighting already repairs the frozen sampling factor. In a one-step world like ours the ratio form is exact, \(g(\theta)=J(\theta)\) for every \(\theta\), so stepping again and again on the old batch with it finds A just as resampling does. What it cannot repair is a finite batch, where large ratios make the estimate noisy, and, as we will see below, a change in which states the policy visits. For those you need to know how far is too far. Kakade and Langford (2002) and Schulman et al. (2015) proved that for the true return \(f\),</p>
+        \[f(\theta)\;\ge\;g(\theta)\;-\;C\cdot\dist(\pi_\old,\pi_\theta)\qquad\text{for every }\theta,\]
+        <p>where \(\dist\) is a KL-type distance between what the two policies do and \(C\) is a constant that grows with the size of the advantages and the horizon.<a class=\"footnote-ref\" href=\"#fn2\" id=\"fnref2\"><sup>2</sup></a> At \(\theta_\old\) the distance is zero and \(g=f\). Away from it, the surrogate may overestimate the return, but by no more than \(C\) times how far the policy moved. Since \(g(\theta_\old)=f(\theta_\old)\), this becomes, for any new \(\theta_1\) however obtained,</p>
+        \[f(\theta_1)-f(\theta_\old)\;\ge\;\underbrace{\big[g(\theta_1)-g(\theta_\old)\big]}_{\text{gain in the loss you can see}}\;-\;\underbrace{C\cdot\dist(\pi_\old,\pi_{\theta_1})}_{\text{price of leaving }\theta_\old}.\]
+        <p>Both terms can be computed from the batch you already have. This is the bridge from the loss you can see to the return you cannot: <strong>the true return is guaranteed to improve whenever the gain in the surrogate beats the price of moving.</strong> TRPO maximizes \(g\) inside a KL ball so the price is capped; PPO clips the ratio, a cheap stand-in for the same cap. Plain REINFORCE takes one step of size \(\eta\) and checks nothing, and for it the bound says something simple: the gain is linear in \(\eta\), the distance is quadratic, so the right-hand side is positive for small steps and negative for large ones. <strong>For REINFORCE, the trust region is the learning rate.</strong></p>
+
+        <p>To see the bound at work we need the smallest problem where the surrogate can be wrong <em>even with infinite data</em>: two decisions in a row, so that which states you visit depends on the policy.</p>
+
+        <figure class="diagram">
+          <img src="figs/mdp_diagram.svg?v=20261014" width="353" height="164" alt="A two-step decision problem. From the start state s0, action L (taken with probability 0.5) leads to state sL and action R (probability 0.5) leads to state sR. At sL, action u pays 0.52 and d pays 0.48, each taken with probability 0.5. At sR, action u pays 1.00 and d pays 0.00, and the old policy takes u with probability 0.35.">
+        </figure>
+
+        <p>At \(s_0\) you go left (L) or right (R); then you pick up (u) or down (d), which pays a reward. Under the old policy, going left is worth \(0.5\) and going right only \(0.35\): u at \(s_R\) pays \(1\), but the old policy picks it just 35% of the time. So the policy gradient says two things at once: pick u more often at \(s_R\), and go left more often, because by the old policy’s standards left is the better branch.</p>
+
+        <figure id="fig-mdp">
+          <a href="figs/fig5_mdp_surrogate.svg?v=20261014"><img src="figs/fig5_mdp_surrogate.svg?v=20261014" width="557" height="382" alt="Value against step size along the policy-gradient direction. The REINFORCE log-form loss rises in a straight line; the ratio-form surrogate rises and flattens near 0.82; the true return peaks at about 0.61 near step size 3 and then falls; the lower bound peaks at a small step near 0.6 and then drops steeply."></a>
+          <figcaption><b>Figure 4:</b> A two-step problem where the states the policy visits depend on the policy. Moving along the policy-gradient direction from \(\theta_\old\): the surrogate \(g\) keeps rising because it credits improvements at a state the old policy visited half the time; the true return \(f\) peaks and then falls as the new policy stops visiting that state at all. The green curve is the bound \(g-C\cdot\dist\); its maximizer is a step that is guaranteed to improve, and the best true step is invisible from old data.</figcaption>
+        </figure>
+
+        <p><a href="#fig-mdp">Figure 4</a> moves along that gradient. The surrogate is a sum over states the <em>old</em> policy visited, and it cannot see that the new policy, by going left more often, has stopped visiting the state where the big reward lives. The bound is not a good estimate of \(f\); it sits far below it almost everywhere. What it gives you is a guarantee: the step it certifies is small and safe. The best true step is about five times larger, and nothing in the old data can tell you so.</p>
+        <p>Two caveats:</p>
+        <ul class="post-list">
+          <li><strong>The distance is always measured to the policy that generated the batch, never to the previous iterate;</strong> this is why PPO’s ratio uses the rollout policy, held fixed across all the minibatch updates on a batch.</li>
+          <li>The bound is <strong>sufficient, not necessary</strong>: a large step can turn out fine, you just cannot tell from old data.</li>
+        </ul>
+
+        <aside class="takeaway">
+          <p class="takeaway-title">So, does the loss mean nothing?</p>
+          <p><strong>Its value means nothing. Its gradient means something at exactly one point, the policy that generated the batch.</strong> After that, the connection to the true return weakens with distance at a known rate, and the TRPO bound is the formula for that rate. Every trust-region trick in RL, from KL penalties toward the rollout policy to PPO clipping to “one epoch per batch,” is a way of keeping that distance small enough that the loss you can see still says something about the return you cannot.</p>
+        </aside>
+
+        <h2 id="part-3">Part 3: The one fact behind both</h2>
+        <p>In supervised learning the dataset is fixed and the model moves toward it. <strong>In RL the model generates the dataset, scores it, and moves; then the dataset is thrown away and a new one is generated for the next step.</strong> Comment 1 and Comment 2 are this loop seen from two different sides. (Spinning Up’s warning box actually says this first, “the data distribution depends on the parameters”; I left it out of the quote above because it is the punchline.)</p>
+        <p><a href="#part-1">Part 1</a> is what the loop does to the <em>objective</em>. The expectation is taken under \(\pi_\theta\), so differentiating it puts \(\pi_k\) (how often each answer is sampled) in front of every update, and that factor turns “match the good answers” into “amplify the good answers you already produce.” Sharpening, slow discovery of rare good answers, and the inability to reach answers the model never samples are all this one factor at work.</p>
+        <p><a href="#part-2">Part 2</a> is what the loop does to the <em>loss</em>. The batch was generated by one particular policy, so it is a faithful picture of the objective only at that policy. The frozen-batch gradient \(\pi_{\old,k}A_k\) shows what happens if you forget: the sampling factor stays glued to the policy that drew the batch, and the model walks off wherever the stale factor points. The trust region is the price of leaving the snapshot; resampling is how you take a new one.</p>
+
+        <div class="table-wrap">
+          <table class="compare">
+            <thead>
+              <tr><th></th><th>SFT</th><th>RL</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Data come from</td><td>a fixed dataset</td><td>the current policy</td></tr>
+              <tr><td>Objective</td><td>concave; optimum \(=p\)</td><td>linear; optimum \(=\) a corner</td></tr>
+              <tr><td>Gradient on a logit</td><td>\(p_k-\pi_k\) (gap to target)</td><td>\(\pi_k(R_k-\bar R)\) (frequency \(\times\) advantage)</td></tr>
+              <tr><td>Batch loss estimates</td><td>the objective, at every \(\theta\)</td><td>the objective’s gradient, at one \(\theta\)</td></tr>
+              <tr><td>Epochs on one batch</td><td>fine; that is the goal</td><td>optimizes a stale snapshot</td></tr>
+              <tr><td>Read the loss curve?</td><td>yes</td><td>no; read the return</td></tr>
+              <tr><td>The model learns</td><td>to cover what the data do</td><td>to commit to what it already does well</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>A few practical habits follow from this:</p>
+        <ul class="post-list habits">
+          <li><strong>Watch the return, not the loss.</strong></li>
+          <li><strong>Don’t run epochs on a rollout batch</strong> unless something (clipping) caps how far you move from the policy that produced it.</li>
+          <li><strong>Expect the learning rate to be more delicate than in SFT</strong>, because for a plain policy-gradient step it is the trust region.</li>
+          <li><strong>Expect entropy to fall and rare good behaviors to emerge slowly.</strong> That is the dynamics, not a bug, and it is why entropy bonuses, asymmetric clipping and sampling temperature are standard knobs.</li>
+          <li><strong>Whenever you see “KL” in an RL paper, ask which one.</strong> The KL to a reference model in the objective is about the destination; the KL to the rollout policy in the trust region is about the step.</li>
+        </ul>
+
+        <section class="further-reading" aria-labelledby="further-reading">
+          <h2 id="further-reading">Further reading</h2>
+          <p>Achiam’s <a href="https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html" target="_blank" rel="noreferrer"><em>Spinning Up: Intro to Policy Optimization</em></a> (2018) is where the warning box comes from. Karpathy’s <a href="http://karpathy.github.io/2016/05/31/rl/" target="_blank" rel="noreferrer"><em>Pong from Pixels</em></a> (2016), Lilian Weng’s <a href="https://lilianweng.github.io/posts/2018-04-08-policy-gradient/" target="_blank" rel="noreferrer"><em>Policy Gradient Algorithms</em></a> (2018) and Rui Shu’s <em>An Homage to REINFORCE</em> (2024) are three views of the policy gradient. Schulman et al.’s <a href="https://arxiv.org/abs/1502.05477" target="_blank" rel="noreferrer">TRPO</a> (2015) and <a href="https://arxiv.org/abs/1707.06347" target="_blank" rel="noreferrer">PPO</a> (2017) papers contain the bound and its cheap approximation. <a href="https://arxiv.org/abs/2404.14367" target="_blank" rel="noreferrer">Tajwar et al. (2024)</a> ablate on-policy sampling and negative weights separately and find that each alone sharpens.</p>
+        </section>
+
+        <section class="footnotes" aria-label="Footnotes">
+          <ol>
+            <li id="fn1"><a href="https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html" target="_blank" rel="noreferrer">https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html</a>, in the “You Should Know” box under “Implementing the Simplest Policy Gradient.” <a href="#fnref1" aria-label="Back to text">↩</a></li>
+            <li id="fn2">Schulman et al. use \(C=4\epsilon\gamma/(1-\gamma)^2\) with \(\epsilon=\max|A|\) and the largest KL over states. Figure 4 plots the tighter version of <a href="https://arxiv.org/abs/1705.10528" target="_blank" rel="noreferrer">Achiam et al. (2017)</a>, whose constant depends on the advantages the new policy picks up; with Schulman’s constant the bound is so loose here that its best step would be \(t=0\). <a href="#fnref2" aria-label="Back to text">↩</a></li>
+          </ol>
+        </section>
+
+        <p class="post-back"><a href="../../#blogs">← Back to homepage</a></p>
+      </div>
+    </article>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <p>Fei Tian · Machine Learning Research</p>
+      <div><a href="https://scholar.google.com/citations?user=SZbCPDEAAAAJ" target="_blank" rel="noreferrer">Scholar</a><a href="https://www.linkedin.com/in/fei-tian-ustc-ml" target="_blank" rel="noreferrer">LinkedIn</a></div>
+    </div>
+  </footer>
+
+  <!-- Cloudflare Web Analytics -->
+  <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"fc04a46edad14ccebbbe4f9968b90908"}'></script>
+  <!-- End Cloudflare Web Analytics -->
+</body>
+</html>

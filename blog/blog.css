@@ -1,0 +1,109 @@
+/* Long-form post styles. Loaded after ../styles.css, which provides the
+   header, footer, colors and fonts shared with the homepage. */
+:root {
+  --post-width: 720px;
+  --box-bg: #f4f4f1;
+  --box-line: #c3c2b7;
+  --ink-a: #2a78d6;
+  --ink-b: #eb6834;
+  --ink-c: #1baf7a;
+}
+
+.post { width: min(var(--post-width), calc(100% - 44px)); margin: 0 auto; padding: 58px 0 64px; }
+
+.post-header { margin-bottom: 38px; padding-bottom: 26px; border-bottom: 1px solid var(--line); }
+.post-header h1 { font-size: clamp(2.1rem, 5vw, 2.9rem); line-height: 1.12; }
+.post-subtitle { margin: 12px 0 0; color: var(--muted); font-family: var(--serif); font-size: 1.3rem; line-height: 1.4; }
+.post-meta { margin: 20px 0 0; color: var(--muted); font-size: 14px; }
+.post-meta .sep { margin: 0 8px; }
+
+.post-body { font-size: 17px; line-height: 1.72; }
+.post-body p { margin: 0 0 1.05em; }
+.post-body strong { color: #17191c; font-weight: 650; }
+.post-body h2 { margin: 2.3em 0 0.7em; font-size: clamp(1.55rem, 3.2vw, 1.9rem); line-height: 1.25; scroll-margin-top: 80px; }
+.post-body h3 { margin: 1.9em 0 0.55em; font-family: var(--serif); font-size: 1.22rem; line-height: 1.35; font-weight: 600; color: #17191c; }
+
+/* Math */
+.katex { font-size: 1.12em; }
+.katex-display { margin: 1.1em 0; padding: 2px 0; overflow-x: auto; overflow-y: hidden; }
+.katex-display > .katex { font-size: 1.12em; }
+/* Two equations shown side by side; they stack on narrow screens.
+   (auto-render wraps each display equation in a <span>, which is the flex item.) */
+.eq-pair { display: flex; flex-wrap: wrap; justify-content: center; column-gap: 3.2em; margin: 1.1em 0; overflow-x: auto; overflow-y: hidden; }
+.eq-pair .katex-display { margin: 0.35em 0; overflow: visible; }
+.eq-numbered { position: relative; padding: 0 2.6em; }
+.eq-tag { position: absolute; top: 50%; right: 0; transform: translateY(-50%); font-family: KaTeX_Main, "Times New Roman", serif; font-size: 1.2em; }
+
+.eq-key { margin: 1.4em auto; padding-top: 0.5em; padding-bottom: 0.5em; border: 1px solid var(--box-line); border-radius: 4px; background: var(--white); }
+
+/* Lists */
+.post-list { margin: 0.2em 0 1.2em; padding-left: 1.6em; }
+.post-list li { margin-bottom: 0.55em; padding-left: 0.3em; }
+.post-list li::marker { color: var(--blue); font-weight: 700; }
+.question-list { margin: 0.2em 0 1.2em; padding-left: 1.6em; list-style: none; }
+.question-list li { position: relative; margin-bottom: 0.35em; }
+.question-list li::before { content: "?"; position: absolute; left: -1.3em; color: var(--blue); font-family: var(--serif); font-weight: 700; }
+.question-list a { color: inherit; text-decoration: underline dotted var(--muted); text-underline-offset: 4px; }
+.question-list a:hover { color: var(--blue); }
+
+/* Boxes */
+.quote-box, .takeaway { border: 1px solid var(--box-line); border-radius: 4px; background: var(--box-bg); }
+.quote-box { margin: 1.3em 0 1.5em; padding: 14px 20px; font-size: 0.94em; line-height: 1.65; }
+.quote-box p { margin: 0; }
+.takeaway { position: relative; margin: 2.4em 0 1.6em; padding: 26px 22px 6px; }
+.post-body .takeaway-title { position: absolute; top: -0.85em; left: 18px; margin: 0; padding: 1px 12px; border: 1px solid var(--box-line); border-radius: 3px; background: var(--box-bg); color: #17191c; font-family: var(--serif); font-size: 1.05rem; font-weight: 700; line-height: 1.5; }
+
+/* Code */
+.post-body pre { margin: 1em 0 1.2em; padding: 12px 16px; overflow-x: auto; border: 1px solid var(--box-line); border-radius: 4px; background: var(--box-bg); font-size: 13.5px; line-height: 1.6; }
+.post-body code { font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace; }
+.post-body pre .c { color: #6f6e69; }
+
+/* Tables (booktabs style) */
+.table-wrap { margin: 1.4em 0 1.6em; overflow-x: auto; }
+.post-body table { margin: 0 auto; border-collapse: collapse; border-top: 1.5px solid #202124; border-bottom: 1.5px solid #202124; font-size: 0.94em; line-height: 1.5; }
+.post-body th, .post-body td { padding: 5px 14px; text-align: left; vertical-align: top; }
+.post-body th.num, .post-body td.num { text-align: center; }
+.post-body thead th { border-bottom: 1px solid #202124; font-weight: 650; }
+.post-body tbody tr:first-child td { padding-top: 8px; }
+.post-body tbody tr:last-child td { padding-bottom: 8px; }
+.compare td:first-child { color: var(--muted); white-space: nowrap; }
+.ans { font-weight: 700; }
+.ans-a { color: var(--ink-a); }
+.ans-b { color: var(--ink-b); }
+.ans-c { color: var(--ink-c); }
+
+/* Figures */
+.post-body figure { margin: 2.2em 0; }
+/* SVGs are 540-620px natural width; scale them up to the column so labels stay legible. */
+.post-body figure img { width: 100%; max-width: 680px; height: auto; margin: 0 auto; }
+.post-body figure > a { display: block; }
+.post-body figure.diagram { margin: 1.2em 0 1.4em; }
+.post-body figure.diagram img { max-width: 440px; }
+.post-body figcaption { max-width: 640px; margin: 14px auto 0; color: #3c4043; font-size: 14.5px; line-height: 1.55; }
+.post-body figcaption b { color: #17191c; }
+
+/* Further reading and footnotes */
+.further-reading { margin-top: 2.6em; padding-top: 1.2em; border-top: 1px solid var(--line); font-size: 15px; }
+.further-reading h2 { margin: 0 0 0.5em; font-size: 1.15rem; }
+.footnote-ref { font-size: 0.75em; line-height: 0; text-decoration: none; }
+.footnotes { margin-top: 1.6em; color: var(--muted); font-size: 13.5px; }
+.footnotes ol { margin: 0; padding-left: 20px; }
+.footnotes a { overflow-wrap: anywhere; }
+.post-body .post-back { margin-top: 2.4em; font-size: 14px; font-weight: 600; }
+.post-body .post-back a { text-decoration: none; }
+
+:target { scroll-margin-top: 80px; }
+
+@media (max-width: 500px) {
+  .post { width: calc(100% - 32px); padding-top: 38px; }
+  .post-subtitle { font-size: 1.12rem; }
+  .post-body { font-size: 16px; }
+  .katex-display > .katex { font-size: 0.98em; }
+  .eq-numbered { padding: 0 2em 0 0; }
+  .quote-box { padding: 12px 14px; }
+  .takeaway { padding: 24px 15px 4px; }
+  .post-body .takeaway-title { left: 12px; font-size: 1rem; }
+  .post-body table { font-size: 0.88em; }
+  .post-body th, .post-body td { padding-left: 6px; padding-right: 6px; }
+  .post-body figcaption { font-size: 13.5px; }
+}
