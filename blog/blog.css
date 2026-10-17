@@ -40,6 +40,7 @@
 .post-list { margin: 0.2em 0 1.2em; padding-left: 1.6em; }
 .post-list li { margin-bottom: 0.55em; padding-left: 0.3em; }
 .post-list li::marker { color: var(--blue); font-weight: 700; }
+.post-list .post-list { margin: 0.5em 0 0.6em; }
 .question-list { margin: 0.2em 0 1.2em; padding-left: 1.6em; list-style: none; }
 .question-list li { position: relative; margin-bottom: 0.35em; }
 .question-list li::before { content: "?"; position: absolute; left: -1.3em; color: var(--blue); font-family: var(--serif); font-weight: 700; }
