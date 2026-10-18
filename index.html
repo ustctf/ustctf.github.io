@@ -37,7 +37,7 @@
         </figure>
 
         <div class="intro-copy">
-          <p class="lead">I am currently a Principal ML Research Scientist at Meta AI. Before joining Meta in 2019, I was a Senior Researcher at Microsoft Research Asia. I received my Ph.D. in Computer Science from the University of Science and Technology of China, under the supervision of <a href="https://scholar.google.com/citations?user=Nh832fgAAAAJ" target="_blank" rel="noreferrer">Dr. Tie-Yan Liu</a>.</p>
+          <p class="lead">I am currently a Principal ML Research Scientist at Meta AI. Before joining Meta in 2019, I was a Senior Researcher at Microsoft Research. I received my Ph.D. in Computer Science from the University of Science and Technology of China, under the supervision of <a href="https://scholar.google.com/citations?user=Nh832fgAAAAJ" target="_blank" rel="noreferrer">Dr. Tie-Yan Liu</a>.</p>
           <p>I work on machine-learning problems that emerge only when models become very large, continuously trained, and connected to real production systems. I am particularly interested in large-scale training, reinforcement learning, continual learning, generative recommendation models, and the interaction between learning algorithms and ML infrastructure.</p>
           <p>I also write <a href="#blogs">technical blogs</a> on understanding modern machine learning and LLM recipes.</p>
 
@@ -67,15 +67,19 @@
             <li>How do we solve the severe overfitting problem that appears when a large-scale sparse model enters its second epoch of training?</li>
             <li>Why does a large production model regularly become over-calibrated for user traffic from a particular country at around 10:00 a.m. every day?</li>
             <li>What is the right reinforcement-learning recipe, both algorithmically and in terms of infrastructure, when the decoding process presents patterns and challenges very different from those in natural-language generation?</li>
-            <li>At tens of billions of examples per day, how should continual learning balance “fitting to the future” with “remembering the past” under minute-to-minute distribution shifts?</li>
           </ol>
           <p class="experience-impact">Collectively, these solutions and ML innovations have consistently delivered billions of dollars in revenue growth for Meta, making this one of the highest-ROI areas in monetization ML.</p>
+          <p class="experience-note">I am also somewhat obsessive about <strong>clean code and minimal design</strong>, so I like to build <strong>lightweight ML infrastructure</strong>: small codebases, short implementations, and clearly designed interfaces, which make bold ML exploration much easier. Two examples:</p>
+          <ol class="plain-enumeration">
+            <li>A nano version of Meta’s flagship monetization model; several major ML initiatives have been explored and launched with it.</li>
+            <li>A lightweight (under 6k lines of code) implementation of a fully asynchronous, Ray-free agentic RL stack that supports several state-of-the-art RL recipes, such as score-function centering.</li>
+          </ol>
         </div>
       </article>
 
       <article class="experience-entry">
         <header class="experience-meta">
-          <h3><a href="https://www.microsoft.com/en-us/research/lab/microsoft-research-asia/" target="_blank" rel="noreferrer">Microsoft Research Asia</a></h3>
+          <h3><a href="https://www.microsoft.com/en-us/research/" target="_blank" rel="noreferrer">Microsoft Research</a></h3>
           <p>2016–2019</p>
         </header>
         <div class="experience-copy">
@@ -120,7 +124,7 @@
       <div class="education-list">
         <article>
           <p class="degree">Ph.D., Computer Science and Technology</p>
-          <p>University of Science and Technology of China<br><span>Joint program with Microsoft Research Asia · 2011–2016</span></p>
+          <p>University of Science and Technology of China<br><span>Joint program with Microsoft Research · 2011–2016</span></p>
         </article>
         <article>
           <p class="degree">B.E., Computer Science and Technology</p>
