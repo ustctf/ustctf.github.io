@@ -96,6 +96,8 @@ h2 { margin: 0; font-family: var(--serif); font-size: clamp(2rem, 4vw, 3rem); li
 .blog-entry h3 a { color: #17191c; text-decoration: none; }
 .blog-entry h3 a:hover { color: var(--blue); text-decoration: underline; }
 .blog-entry p { max-width: 760px; margin: 0; }
+.blog-entry .plain-enumeration { max-width: 760px; margin: 8px 0 10px; }
+.blog-entry .plain-enumeration li { margin-bottom: 6px; }
 .blog-entry .blog-date { padding-top: 3px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 
 .education-list { display: grid; grid-template-columns: 1fr 1fr; gap: 35px; }

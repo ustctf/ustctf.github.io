@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A bias–variance view of off-policy LLM RL updates: the drift that score-function centering removes, the two gaps it leaves, and when TIS + centering beats both SFC and importance sampling.">
+  <meta name="author" content="Fei Tian">
+  <title>What Score-Function Centering Fixes, and What It Leaves · Fei Tian</title>
+  <link rel="stylesheet" href="../../styles.css?v=20261025">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
+  <link rel="stylesheet" href="../blog.css?v=20261025b">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      renderMathInElement(document.querySelector('.post-body'), {
+        delimiters: [
+          { left: '\\[', right: '\\]', display: true },
+          { left: '\\(', right: '\\)', display: false },
+        ],
+        macros: {
+          '\\E': '\\mathbb{E}',
+          '\\Cov': '\\mathrm{Cov}',
+          '\\KL': 'D_{\\mathrm{KL}}',
+          '\\grad': '\\nabla_{\\theta}',
+          '\\Aq': 'A^{q}',
+          '\\Ap': 'A^{p}',
+          '\\wt': '\\tilde w',
+        },
+        throwOnError: false,
+      });
+    });
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="site-name" href="../../">Fei Tian's Homepage</a>
+      <nav aria-label="Primary navigation">
+        <a href="../../#about">About</a>
+        <a href="../../#experience">Experience</a>
+        <a href="../../#publications">Publications</a>
+        <a href="../../#blogs">Blogs</a>
+        <a href="../../#education">Education</a>
+        <a href="../../#beliefs">Beliefs</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <article class="post">
+      <header class="post-header">
+        <h1>What Score-Function Centering Fixes, and What It Leaves</h1>
+        <p class="post-subtitle">A bias–variance view of off-policy LLM RL updates</p>
+        <p class="post-meta">Fei Tian with Claude<span class="sep">·</span>October 2026<span class="sep">·</span><a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf">full version (PDF, 65 pages)</a></p>
+      </header>
+
+      <div class="post-body">
+        <aside class="full-version-note">
+          <p>If you have time, you are strongly encouraged to read the <a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf"><strong>full version</strong></a> (PDF, 65 pages). It has the derivations, the general form of each result below, and the methods this post leaves out.</p>
+        </aside>
+
+        <p>In September 2026, Together AI proposed <em>score centering</em> for off-policy RL of language models <a class="cite" href="#ref-1">[1]</a>. At every prefix, it subtracts from the trainer’s score its average under the sampler, the policy that generated the data. In their implementation it adds one term to the loss and less than \(1\%\) to the wall-clock time, and it gives strong results in their experiments. <strong>As far as we know, the same correction is already common in large-scale RL recipes at frontier labs, under names such as “<em>score function centering</em>”, “<em>alternative tokens</em>”, and “<em>covariance learning</em>”.</strong> Following Zhang <a class="cite" href="#ref-2">[2]</a>, we call it SFC.</p>
+
+        <p>Why does it work, and what does it not fix? Several explanations exist <a class="cite" href="#ref-1">[1–3]</a>; this post answers with a basic fact from statistics. A policy-gradient update is an estimate of the true gradient of the expected reward, computed from a batch of sampled responses. For any estimate \(\hat G\) of a quantity \(G\), the mean squared error is the squared bias plus the variance <a class="cite" href="#ref-4">[4, 5]</a>:</p>
+        <div id="eq-mse">
+          \[\E\big[(\hat G - G)^2\big] \;=\; \underbrace{\big(\E[\hat G] - G\big)^2}_{\text{squared bias}} \;+\; \underbrace{\mathrm{Var}(\hat G)}_{\text{variance}} .\tag{1}\]
+        </div>
+        <p>The bias is how far the estimate is from \(G\) on average, and more data does not reduce it. The variance is how much the estimate scatters around its own average, and it shrinks as the batch grows. On-policy, REINFORCE is unbiased, and a baseline that does not depend on the response leaves the expected update unchanged while it can lower the variance. Off-policy, the samples come from a sampler that differs from the policy being trained, the update becomes biased, and every correction in use changes the bias, the variance, or both. In these terms, the answer has three parts:</p>
+        <ol class="post-list">
+          <li><strong>Bias.</strong>
+            <ol class="post-list alpha">
+              <li><strong>SFC removes a key bias of off-policy updates, called drift</strong> (<a href="#sec-drift">Section 2</a>). It is the baseline’s error times a vector that averages to zero on-policy but not off-policy.</li>
+              <li><strong>SFC leaves two other biases</strong> (<a href="#sec-gaps">Section 3</a>). The tokens are weighted by the sampler’s probabilities instead of the trainer’s, and the prefixes and continuations still come from the sampler; keeping the trainer close to the sampler helps keep both small.</li>
+            </ol>
+          </li>
+          <li><strong>Variance</strong> (<a href="#sec-variance">Section 4</a>). Importance sampling (IS) without truncation removes drift and the first of these biases, but in many settings, especially fully asynchronous RL with large staleness, its variance is much larger than SFC’s. Truncated importance sampling (TIS) <a class="cite" href="#ref-6">[6]</a> caps the ratio to control large weights, which brings bias back.</li>
+          <li><strong>Total error</strong> (<a href="#sec-tis">Section 5</a>). Combining the two, TIS + centering (weight with the truncated ratio, then center as SFC does) can give a better trade-off than either alone; in a toy model it is most often the best at a moderate lag and a middle range of sample sizes.</li>
+        </ol>
+        <p>A <a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf">longer companion note</a> <a class="cite" href="#ref-7">[7]</a> has the derivations, the general version of each result, and other methods such as GSPO <a class="cite" href="#ref-8">[8]</a>, length-weighted baselines, and PPO’s clipping <a class="cite" href="#ref-9">[9]</a>.</p>
+
+        <h2 id="sec-setup"><span class="secno">1</span>Setup</h2>
+        <p>The <strong>sampler</strong> \(q\) generates the data, and the <strong>trainer</strong> \(p = p_\theta\) is the policy being updated. They differ because of engine mismatch (quantization, different kernels), staleness (asynchronous training), or sampling settings (temperature, top-\(k\)). At a prefix \(s\), the trainer has logits \(z(s, v)\), and the score of token \(v\) is</p>
+        <div id="eq-score">
+          \[g(s, v) \;=\; \grad\log p(v \mid s) \;=\; \grad z(s, v) - m_p(s), \qquad m_\pi(s) \;=\; \sum_v \pi(v \mid s)\,\grad z(s, v) .\tag{2}\]
+        </div>
+        <p>The goal is the gradient \(\grad J\) of the trainer’s expected reward. REINFORCE <a class="cite" href="#ref-10">[10]</a> multiplies each token’s score by \(R - b\), where \(R\) is the reward and \(b\) a baseline that does not depend on the response itself, such as a fixed value or the mean reward of the other responses (RLOO <a class="cite" href="#ref-12">[12, 13]</a>); GRPO’s group mean <a class="cite" href="#ref-11">[11]</a> includes the response itself (<a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf">full version</a>, Chapter 8). We write \(Q^q(s, v)\) for the expected reward after choosing \(v\) and letting the sampler finish, \(V^q(s) = \sum_v q(v \mid s)\,Q^q(s, v)\) for the value of the prefix, and \(\Aq = Q^q - V^q\) for the advantage.</p>
+
+        <h2 id="sec-drift"><span class="secno">2</span>The bias SFC removes: drift from the baseline’s error</h2>
+        <p>On-policy, the score averages to zero, \(\E_p[g] = \sum_v \grad p(v) = 0\), so a baseline cannot change the expected update. Off-policy, the tokens come from \(q\), and \(\E_q[g] = m_q - m_p\) is in general not zero. To see what this does, fix a prefix \(s\) and average over the next token \(v \sim q\) and the sampler’s continuation. The baseline does not depend on the response, so token \(v\) is multiplied on average by \(Q^q(s, v) - \E[b \mid s]\). Writing \(Q^q = \Aq + V^q\) and using \(\sum_v q(v)\,g(s, v) = m_q(s) - m_p(s)\),</p>
+        <div id="eq-split">
+          \[\begin{aligned}
+          \E\big[(R - b)\,g \,\big|\, s\big]
+          &= \sum_v q(v)\,\big(Q^q(s, v) - \E[b \mid s]\big)\,g(s, v) \\
+          &= \sum_v q(v)\,\big(\Aq(s, v) + V^q(s) - \E[b \mid s]\big)\,g(s, v) \\
+          &= \underbrace{\sum_v q(v)\,\Aq(s, v)\,g(s, v)}_{\text{signal}}
+          \;+\; \underbrace{\big(V^q(s) - \E[b \mid s]\big)\big(m_q(s) - m_p(s)\big)}_{\text{drift}} .
+          \end{aligned}\tag{3}\]
+        </div>
+        <p>The two terms play very different roles:</p>
+        <ul class="post-list">
+          <li><strong>Signal.</strong> This is the term we want to keep. It has the form of the ordinary policy gradient, an advantage-weighted average of the score, but with the sampler’s advantage \(\Aq\) and token probabilities, so it is not yet the trainer’s policy gradient (<a href="#sec-gaps">Section 3</a> measures the difference).</li>
+          <li><strong>Drift.</strong> This is the problem. Its first factor, \(V^q(s) - \E[b \mid s]\), is the gap between the expected baseline and the value of the current prefix, which is the ideal baseline here. The baseline is often computed from other responses to the same prompt, so it can be random (hence its conditional mean), and even an accurate prompt-level baseline can be far from the value of the current prefix. The second factor is the mean of the score under the sampler, which is zero on-policy, so there this gap does no harm. <strong>Off-policy the second factor is in general not zero, so the baseline, added to reduce variance, now brings in bias.</strong></li>
+        </ul>
+
+        <aside class="takeaway example">
+          <p class="takeaway-title">Example 1: two tokens, a slightly different sampler</p>
+          <p>After the first token the final answer is correct with probability \(0.91\), after the second with \(0.89\). The trainer picks the first token with probability \(0.65\), the sampler with \(0.6\) (a KL divergence of only \(0.0054\)), so this prefix is worth \(V^q = 0.902\). The parameter is the log-odds of the first token, so the two scores are \(1 - 0.65 = 0.35\) and \(-0.65\). Their mean under the sampler is \(0.6(0.35) + 0.4(-0.65) = -0.05\), so at \(b = 0.5\) the drift is \((0.902 - 0.5)(-0.05) = -0.0201\).</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>baseline \(b\)</th><th class="r">\(0\)</th><th class="r">\(0.5\) (prompt’s success rate)</th><th class="r">\(0.902\) (prefix value)</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>signal</td><td class="r">\(0.0048\)</td><td class="r">\(0.0048\)</td><td class="r">\(0.0048\)</td></tr>
+                <tr><td>drift</td><td class="r">\(-0.0451\)</td><td class="r">\(-0.0201\)</td><td class="r">\(0\)</td></tr>
+                <tr><td>expected update</td><td class="r">\(\mathbf{-0.0403}\)</td><td class="r">\(\mathbf{-0.0153}\)</td><td class="r">\(0.0048\)</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>A baseline that is good for the prompt (\(0.5\)) is far from the value of this prefix. The drift then outweighs the signal and has the opposite sign, so the update lowers the probability of the better token.</p>
+        </aside>
+
+        <p>The gap between the baseline and the prefix value can be large, for two reasons:</p>
+        <ul class="post-list">
+          <li>Group baselines such as RLOO’s and GRPO’s estimate the value of the prompt, but they are used at every prefix, and halfway through a response the prefix value is often near \(0\) or \(1\).</li>
+          <li>The signal shrinks as the tokens’ qualities become similar, but this gap need not shrink with it.</li>
+        </ul>
+        <p>So drift can dominate even when \(q\) and \(p\) are close, and more samples do not average it out.</p>
+        <p>SFC sets the second factor to zero by centering the score under the sampler, \(h = g - \E_q[g] = \grad z - m_q\). The same computation with \(h\) in place of \(g\) gives</p>
+        <div id="eq-sfc">
+          \[\begin{aligned}
+          \E\big[(R - b)\,h \,\big|\, s\big]
+          &= \sum_v q(v)\,\Aq(s, v)\,h(s, v) \;+\; \big(V^q(s) - \E[b \mid s]\big)\underbrace{\sum_v q(v)\,h(s, v)}_{=\,0} \\
+          &= \sum_v q(v)\,\Aq(s, v)\,g(s, v) \;=\; \Cov_q\big(\Aq, \grad z\big) .
+          \end{aligned}\tag{4}\]
+        </div>
+        <p>The second line uses \(\sum_v q(v)\,\Aq(s, v) = 0\): shifting the score by a vector that does not depend on \(v\) (from \(m_q\) to \(m_p\)) leaves the sum unchanged. So <strong>SFC keeps the signal exactly and removes the drift, for any baseline that does not depend on the response</strong>: in Example 1 the expected update is \(0.0048\) for every \(b\) (<a href="#fig-baseline">Figure 1</a>). The center \(m_q\) has to come from the sampler, in one of two ways:</p>
+        <ul class="post-list">
+          <li><strong>Independent auxiliary samples.</strong> Draw \(K\) extra tokens \(a'_1, \dots, a'_K\) from \(q\) at the same prefix, independently of the main sample, and use their average score. This is unbiased but adds sampling variance.</li>
+          <li><strong>Logged head with a modeled tail.</strong> Keep the sampler’s top-\(k\) probabilities and spread the remaining mass according to the trainer (Together AI’s default, \(k = 128\) <a class="cite" href="#ref-1">[1, 14]</a>). This adds no sampling noise, but it is an approximation and can leave some drift.</li>
+        </ul>
+        <p>With auxiliary samples, the loss for a sampled token \(a\) is</p>
+        \[\mathcal L \;=\; -(R - b)\,\Big[\log p(a \mid s) - \frac{1}{K}\sum_{k=1}^{K}\log p(a'_k \mid s)\Big],\]
+        <p>with \(R - b\) held fixed. Its gradient is \(-(R - b)\) times an unbiased estimate of \(h(a)\); the log-softmax normalizer cancels, so the same loss can be written with logits.</p>
+
+        <figure id="fig-baseline">
+          <a href="figs/baseline_example1.svg"><img src="figs/baseline_example1.svg" width="576" height="278" alt="Expected update in Example 1 against the baseline b from 0 to 1. Plain REINFORCE is a rising straight line from about minus 0.04 at b = 0, passing minus 0.0153 at b = 0.5 and crossing 0.0048 at b = 0.902, the prefix value. SFC is flat at 0.0048 and exact importance sampling is flat at 0.00455."></a>
+          <figcaption><b>Figure 1:</b> Expected update in Example 1 as a function of the baseline. SFC and exact importance sampling are flat; plain REINFORCE agrees with SFC only when \(b\) equals the prefix value.</figcaption>
+        </figure>
+
+        <h2 id="sec-gaps"><span class="secno">3</span>The bias SFC leaves: two gaps</h2>
+        <p>With drift gone, compare what SFC estimates with what we want. The trainer’s true gradient is the same kind of signal, summed over positions \(t\), but with everything taken from the trainer: its prefixes, its token probabilities, and its advantage \(\Ap\) (continuations by the trainer). Since \(\sum_v p(v)\,\Ap(s, v) = 0\), the same shift gives</p>
+        <div id="eq-gradJ">
+          \[\grad J \;=\; \sum_t \E_{s_t \sim p}\Big[\sum_v p(v \mid s_t)\,\Ap(s_t, v)\,g(s_t, v)\Big] \;=\; \sum_t \E_{s_t \sim p}\big[\Cov_p(\Ap, \grad z)\big] .\tag{5}\]
+        </div>
+        <p>SFC estimates \(\sum_t \E_{s_t \sim q}\big[\Cov_q(\Aq, \grad z)\big]\). Adding and subtracting \(\sum_t \E_{s_t \sim q}\big[\Cov_p(\Aq, \grad z)\big]\) splits the difference into two gaps:</p>
+        <div id="eq-gaps">
+          \[\begin{aligned}
+          \E\big[\hat g_{\mathrm{SFC}}\big] - \grad J \;=\;\;
+          &\underbrace{\sum_t \E_{s_t \sim q}\big[\Cov_q(\Aq, \grad z) - \Cov_p(\Aq, \grad z)\big]}_{\text{B: token weights}} \\
+          +\;&\underbrace{\sum_t \E_{s_t \sim q}\big[\Cov_p(\Aq, \grad z)\big] - \sum_t \E_{s_t \sim p}\big[\Cov_p(\Ap, \grad z)\big]}_{\text{C: prefixes and continuations}} .
+          \end{aligned}\tag{6}\]
+        </div>
+
+        <h3 id="sec-B"><span class="secno">3.1</span>Token weights (B)</h3>
+        <p>B is about which tokens count at each prefix. Exact importance sampling multiplies each sample by \(r = p/q\), which turns the sampler’s token weights into the trainer’s (this needs \(q(v) > 0\) wherever \(p(v) > 0\), which hard top-\(k\) or top-\(p\) sampling can break):</p>
+        <div id="eq-is">
+          \[\begin{aligned}
+          \E\big[r\,(R - b)\,g \,\big|\, s\big]
+          &= \sum_v p(v)\,\big(Q^q(s, v) - \E[b \mid s]\big)\,g(s, v) \\
+          &= \sum_v p(v)\,\Aq(s, v)\,g(s, v) \;=\; \Cov_p(\Aq, \grad z) ,
+          \end{aligned}\tag{7}\]
+        </div>
+        <p>because \(\sum_v p(v)\,g(s, v) = 0\). The same fact removes drift, so exact IS removes both drift and B.</p>
+
+        <aside class="takeaway example">
+          <p class="takeaway-title">Example 2: B, a very stale sampler</p>
+          <p>Three tokens, with the logits as parameters. The sampler rarely picks the best token, \(q = (0.1, 0.1, 0.8)\), while the trainer has learned it, \(p = (0.8, 0.1, 0.1)\). Under the sampler’s continuations the tokens are worth \(Q^q = (1, 0.5, 0)\), so the sampler’s average is \(0.15\) and the trainer’s is \(0.85\).</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr class="top"><th></th><th></th><th class="cmid" colspan="2">expected logit update</th></tr>
+                <tr><th>token</th><th class="r">\(Q^q\)</th><th class="r">SFC, \(\Cov_q\)</th><th class="r">exact IS, \(\Cov_p\)</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>1 (best)</td><td class="r">\(1\)</td><td class="r">\(+0.085\)</td><td class="r">\(+0.120\)</td></tr>
+                <tr><td>2 (middle)</td><td class="r">\(0.5\)</td><td class="r">\(\mathbf{+0.035}\)</td><td class="r">\(\mathbf{-0.035}\)</td></tr>
+                <tr><td>3 (worst)</td><td class="r">\(0\)</td><td class="r">\(-0.120\)</td><td class="r">\(-0.085\)</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Token 2 is better than the sampler’s average but worse than the trainer’s, so SFC raises its logit while exact IS lowers it. Its probability falls under both, since token 1’s logit rises more, but about five times less under SFC.</p>
+        </aside>
+
+        <h3 id="sec-C"><span class="secno">3.2</span>Prefixes and continuations (C)</h3>
+        <p>C is about which prefixes the data contain and how they are finished. The current token’s ratio cannot fix it. Weighting by the ratio over the whole response is one exact fix, but its variance grows exponentially with the length: with independent per-token ratios of standard deviation \(0.05\), the second moment of the product over \(500\) tokens is about \(3.5\), and with \(0.1\) it is about \(145\).</p>
+
+        <aside class="takeaway example">
+          <p class="takeaway-title">Example 3: C, two solution routes</p>
+          <p>At step 1 the model picks a route, X or Y; at step 2 it finishes along that route. (a) A stale sampler picks X more often, but both policies behave the same at step 2. (b) Both pick each route half the time; after Y both succeed \(50\%\) of the time, after X the sampler succeeds less often than the trainer.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th></th><th></th><th class="r">sampler</th><th class="r">trainer</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>(a)</td><td>probability of route X</td><td class="r">\(0.9\)</td><td class="r">\(0.5\)</td></tr>
+                <tr><td></td><td>weight on learning to finish route Y</td><td class="r">\(0.1\)</td><td class="r">\(0.5\)</td></tr>
+                <tr class="group"><td>(b)</td><td>success rate after X</td><td class="r">\(0.2\)</td><td class="r">\(0.6\)</td></tr>
+                <tr><td></td><td>step-1 update for X</td><td class="r">\(\mathbf{-0.075}\)</td><td class="r">\(\mathbf{+0.025}\)</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>In (a) every per-token ratio at step 2 is \(1\), yet route Y gets a fifth of its weight. In (b) the sampler’s continuations flip the sign of the update.</p>
+        </aside>
+
+        <h3 id="sec-kl"><span class="secno">3.3</span>Both gaps shrink when the trainer stays close to the sampler</h3>
+        <p>Both gaps vanish when \(p = q\), and bounds on them tighten as the two policies get closer:</p>
+        <ul class="post-list">
+          <li><strong>B.</strong> At a prefix, \(\Cov_q(\Aq, \grad z) - \Cov_p(\Aq, \grad z) = \sum_v \big(q(v) - p(v)\big)\,\Aq(v)\,g(v)\), a sum weighted by \(q - p\), so by Pinsker’s inequality its length is at most \(\max_v\|\Aq(v)\,g(v)\|\,\sum_v|q(v) - p(v)| \le \max_v\|\Aq(v)\,g(v)\|\,\sqrt{2\,\KL(q\,\|\,p)}\) <a class="cite" href="#ref-2">[2]</a>.</li>
+          <li><strong>C.</strong> In the objective, the matching gap is second order in the total variation between the policies (the TRPO bound <a class="cite" href="#ref-15">[15]</a>); in the gradient it is first order, and it grows with the length of the response (<a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf">full version</a>, Chapters 7 and 11).</li>
+        </ul>
+        <p>So limiting the age of samples, or adding a KL penalty toward the sampler as Zhang <a class="cite" href="#ref-2">[2]</a> and Tinker’s StableReinforce loss <a class="cite" href="#ref-16">[16]</a> do, <strong>helps keep both gaps small, though it removes neither</strong>; how small also depends on the length of the response and the size of the advantages.</p>
+        <p>One caveat: suppose you deploy the inference engine itself, its logits are the trainer’s plus an error that does not change with \(\theta\), the rollouts come from the current parameters, and the center is exact. Then \(h = \grad\log q_\theta\), SFC is the exact gradient for what you deploy, and B and C are not errors. Under staleness the target is the trainer, and both gaps are real.</p>
+
+        <h2 id="sec-variance"><span class="secno">4</span>Variance: SFC versus importance sampling</h2>
+        <p>Unless stated otherwise, the comparisons below use exact centering; sampling the center adds variance, and modeling the sampler’s tail can leave some bias. Removing B with importance sampling has a price. Write \(M(v) = \E\big[(R - b)^2 \,\big|\, s, v\big]\) for the mean squared multiplier of token \(v\). The second moment of the update from one sample is</p>
+        <div id="eq-var">
+          \[\begin{aligned}
+          \text{SFC:}\quad & \E_q\big[(R - b)^2\,\|h\|^2\big] \;=\; \sum_v q(v)\,M(v)\,\|h(v)\|^2, \\
+          \text{exact IS:}\quad & \E_q\big[r^2\,(R - b)^2\,\|g\|^2\big] \;=\; \sum_v \frac{p(v)^2}{q(v)}\,M(v)\,\|g(v)\|^2 ,
+          \end{aligned}\tag{8}\]
+        </div>
+        <p>and the variance is this minus the squared length of the mean. Two things follow:</p>
+        <ul class="post-list">
+          <li><strong>IS.</strong> The sampler’s probability \(q(v)\) sits in the denominator, so tokens that the sampler rarely draws but the trainer likes dominate. The usual summary is the effective sample size, \(N/\E_q[r^2]\) with \(\E_q[r^2] = \sum_v p(v)^2/q(v)\). In fully asynchronous RL, where samples can be many steps old, the ratios spread out, the effective sample size drops, and the variance of IS can be far above that of SFC.</li>
+          <li><strong>SFC.</strong> No ratio enters its multiplier, even when its center is estimated from alternative tokens. Its variance still depends on the baseline: in Example 1, with success/failure rewards, the samples needed before the standard deviation of the average falls to the size of its mean drop from about \(9350\) at \(b = 0\) to \(950\) at \(b = V^q\). The baseline cannot remove the noise of the outcome itself.</li>
+        </ul>
+
+        <h3 id="sec-trunc"><span class="secno">4.1</span>Truncation controls large weights and brings bias back</h3>
+        <p>Truncated IS caps the ratio, \(\wt = \min(r, \bar r)\) <a class="cite" href="#ref-6">[6]</a>; masked IS (MIS) sets it to zero outside an interval <a class="cite" href="#ref-17">[17, 18]</a>. No weight exceeds the cap, so large weights cannot dominate the update, but bias comes back in two ways:</p>
+        <ul class="post-list">
+          <li><strong>Drift returns.</strong> Once ratios are capped, \(\E_q[\wt\,g] \neq 0\), so the multiplier no longer averages to zero.</li>
+          <li><strong>B is corrected only partly.</strong> Tokens whose ratio exceeds the cap keep part of the sampler’s weight.</li>
+        </ul>
+
+        <h2 id="sec-tis"><span class="secno">5</span>The total error: TIS + centering</h2>
+        <p>Eq. <a href="#eq-mse">(1)</a> adds up the bias and variance of Sections <a href="#sec-drift">2</a>–<a href="#sec-variance">4</a>. First we add a third candidate, between SFC and exact IS.</p>
+
+        <h3 id="sec-tiscenter"><span class="secno">5.1</span>TIS + centering</h3>
+        <p>Of the two problems of truncation (<a href="#sec-trunc">Subsection 4.1</a>), the first has a simple fix: <strong>weight first, then center</strong>, as SFC does. We call this TIS + centering: \(f = \wt\,g - \E_q[\wt\,g]\). The computation of <a href="#sec-drift">Section 2</a> with \(f\) in place of \(g\) gives</p>
+        <div id="eq-tis">
+          \[\begin{aligned}
+          \E\big[(R - b)\,f \,\big|\, s\big]
+          &= \sum_v q(v)\,\Aq(s, v)\,f(s, v) \;+\; \big(V^q(s) - \E[b \mid s]\big)\underbrace{\sum_v q(v)\,f(s, v)}_{=\,0} \\
+          &= \sum_v q(v)\,\wt(v)\,\Aq(s, v)\,g(s, v) \\
+          &= \sum_v \min\big(p(v),\, \bar r\,q(v)\big)\,\Aq(s, v)\,g(s, v) ,
+          \end{aligned}\tag{9}\]
+        </div>
+        <p>where the second line again uses \(\sum_v q(v)\,\Aq(s, v) = 0\), now to drop the constant \(\E_q[\wt\,g]\). So drift is gone; tokens whose ratio is below the cap get the trainer’s weight exactly, and the others are corrected partly. The order matters: centering first and then multiplying by \(r\) gives \(\E_q[r\,h] = m_p - m_q \neq 0\), which is drift with the opposite sign.</p>
+        <p>Capping also lowers the total weight to \(Z = \sum_v \min\big(p(v), \bar r\,q(v)\big) \le 1\), which acts like a smaller step at this prefix. To compare directions and noise rather than step sizes, the comparisons below use \(f/Z\), so that all three methods have total weight \(1\). Without this rescaling, TIS + centering does even better with few samples, partly only because its steps are shorter (<a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf">full version</a>, Subsection 9.6).</p>
+
+        <h3 id="sec-mseprefix"><span class="secno">5.2</span>The total error at one prefix</h3>
+        <p>To write Eq. <a href="#eq-mse">(1)</a> for these estimators, we simplify in two ways.</p>
+        <ul class="post-list">
+          <li><strong>One prefix.</strong> We fix a prefix \(s\) and average \(N\) independent single-sample updates there. Call one of them \(\hat g\) and their average \(\hat g_N\).</li>
+          <li><strong>The sampler’s continuations.</strong> The target is what exact IS estimates at this prefix, \(G(s) = \sum_v p(v)\,\Aq(s, v)\,g(s, v) = \Cov_p(\Aq, \grad z)\). It still uses the sampler’s advantage \(\Aq\), so gap C is left out: none of the three methods removes it, and a small KL keeps it small (<a href="#sec-kl">Subsection 3.3</a>).</li>
+        </ul>
+        <p>For a vector, Eq. <a href="#eq-mse">(1)</a> holds with squared lengths:</p>
+        <div id="eq-mseprefix">
+          \[\E\big\|\hat g_N - G(s)\big\|^2 \;=\; \underbrace{\big\|\E[\hat g] - G(s)\big\|^2}_{\text{squared bias}} \;+\; \frac{1}{N}\,\underbrace{\Big(\E\|\hat g\|^2 - \big\|\E[\hat g]\big\|^2\Big)}_{\text{variance of one sample}} .\tag{10}\]
+        </div>
+        <p>Equations <a href="#eq-sfc">(4)</a>, <a href="#eq-is">(7)</a>, <a href="#eq-var">(8)</a> and <a href="#eq-tis">(9)</a> give the two ingredients for each method:</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>method</th><th>bias, \(\E[\hat g] - G(s)\)</th><th>second moment, \(\E\|\hat g\|^2\)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>SFC</td><td>\(\sum_v \big(q(v) - p(v)\big)\,\Aq(v)\,g(v)\)</td><td>\(\sum_v q(v)\,M(v)\,\|h(v)\|^2\)</td></tr>
+              <tr><td>exact IS</td><td>\(0\)</td><td>\(\sum_v \tfrac{p(v)^2}{q(v)}\,M(v)\,\|g(v)\|^2\)</td></tr>
+              <tr><td>TIS + centering</td><td>\(\tfrac{1}{Z}\sum_{v:\,r(v) > \bar r} \big(p(v) - \bar r\,q(v)\big)\big(G(s) - \Aq(v)\,g(v)\big)\)</td><td>\(\tfrac{1}{Z^2}\sum_v q(v)\,M(v)\,\|f(v)\|^2\)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>SFC has a bias (the gap B at this prefix) but no ratio in its second moment; exact IS has no bias but the ratio \(p/q\); the bias of TIS + centering comes only from tokens above the cap, and its weights are at most \(\bar r/Z\). Since only the variance term shrinks with \(N\), the best method depends on \(N\). Roughly, in real training a prefix appears once but the update adds up many prefixes; when their B gaps point the same way, B adds up while the noise partly averages out, as with a larger \(N\).</p>
+        <p>In Example 2, with deterministic returns and \(b = V^q\), SFC has squared bias \(0.0074\) and single-sample variance \(0.102\), and exact IS has no bias and variance \(0.273\), so SFC has the lower total error below about \(23\) samples and exact IS above.</p>
+
+        <h3 id="sec-regime"><span class="secno">5.3</span>Which method has the lowest total error</h3>
+        <p>To see how the terms of Eq. <a href="#eq-mseprefix">(10)</a> compare, we use random problems with 20 tokens in which a parameter \(\kappa\) sets the lag between trainer and sampler (<a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf">full version</a>, Subsection 9.6). There, at a moderate lag, TIS + centering removes half or more of B at less variance than exact IS, and at a very large lag it gains little. <a href="#tab-regime">Table 1</a> adds the two terms.</p>
+
+        <div class="table-wrap" id="tab-regime">
+          <table class="regime">
+            <thead>
+              <tr><th>ESS fraction</th><th>\(N = 1\)</th><th>\(N = 16\)</th><th>\(N = 64\)</th><th>\(N = 256\)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>\(0.8\)–\(1\)</td><td class="c-sfc">SFC \(57\%\)</td><td class="c-sfc">SFC \(48\%\)</td><td class="c-is">exact IS \(62\%^{\ast}\)</td><td class="c-is">exact IS \(84\%^{\ast}\)</td></tr>
+              <tr><td>\(0.6\)–\(0.8\)</td><td class="c-sfc">SFC \(65\%\)</td><td class="c-tis"><strong>TIS + centering</strong> \(44\%\)</td><td class="c-tis"><strong>TIS + centering</strong> \(65\%\)</td><td class="c-is">exact IS \(71\%\)</td></tr>
+              <tr><td>\(0.4\)–\(0.6\)</td><td class="c-sfc">SFC \(68\%\)</td><td class="c-tis"><strong>TIS + centering</strong> \(45\%\)</td><td class="c-tis"><strong>TIS + centering</strong> \(46\%\)</td><td class="c-is">exact IS \(92\%\)</td></tr>
+              <tr><td>\(0.2\)–\(0.4\)</td><td class="c-sfc">SFC \(78\%\)</td><td class="c-sfc">SFC \(47\%\)</td><td class="c-is">exact IS \(55\%\)</td><td class="c-is">exact IS \(94\%\)</td></tr>
+              <tr><td>below \(0.2\)</td><td class="c-sfc">SFC \(87\%\)</td><td class="c-sfc">SFC \(73\%\)</td><td class="c-sfc">SFC \(46\%\)</td><td class="c-is">exact IS \(81\%\)</td></tr>
+            </tbody>
+          </table>
+          <p class="table-caption"><b>Table 1:</b> The method that most often has the lowest total error, Eq. <a href="#eq-mseprefix">(10)</a>, in the random toy: \(200{,}000\) problems with \(\kappa\) log-uniform between \(0.25\) and \(12\) (seed 11), deterministic return, \(b = V^q\), exact centering, \(\bar r = 2\), grouped by the ESS fraction \(1/\E_q[r^2]\). \(N\) is the number of independent samples at one prefix. Each cell gives the most frequent winner and its share, which can be under half; TIS + centering is \(f/Z\) (<a href="#sec-tiscenter">Subsection 5.1</a>). \(^{\ast}\)Above \(0.8\) the cap rarely binds: in \(84\%\) of these problems TIS + centering equals exact IS, and those cases count as exact IS.</p>
+        </div>
+
+        <p>In this toy, the method that most often has the lowest error is:</p>
+        <ul class="post-list">
+          <li>SFC with few samples, where the variance dominates;</li>
+          <li>exact IS with many samples, where only bias is left;</li>
+          <li><strong>TIS + centering in between, when the effective sample size is moderate.</strong></li>
+        </ul>
+        <p>When the effective sample size is low, the cap binds on the tokens that carry most of B, so TIS + centering keeps much of the bias and still has more variance than SFC (in Example 2: distance to exact IS \(0.106\) versus \(0.086\), variance \(0.265\) versus \(0.102\)). Return noise and the choice of baseline also move these boundaries, in either direction.</p>
+        <p>In Together AI’s staleness experiments, with the sampler refreshed only every 64 steps, TIS + centering (and the same with MIS) worked better than SFC alone <a class="cite" href="#ref-1">[1]</a>.</p>
+
+        <h2 id="sec-practice"><span class="secno">6</span>In practice</h2>
+        <ul class="post-list">
+          <li><strong>Decide the target.</strong> SFC is the exact gradient for the deployed sampler only under the conditions of <a href="#sec-kl">Subsection 3.3</a>.</li>
+          <li><strong>Use SFC</strong> with auxiliary tokens drawn independently of the main sample, or with a logged top-\(k\) head (approximate in the tail), and compute \(q\) with the sampler’s actual temperature and truncation.</li>
+          <li><strong>With TIS or MIS, weight first and then center</strong> (TIS + centering), and write the loss with log-probabilities rather than logits.</li>
+          <li><strong>Keep \(p\) close to \(q\)</strong> with a limit on sample age or a KL penalty toward the sampler, and add TIS + centering when the lag is moderate.</li>
+          <li><strong>Check GRPO-style length and standard-deviation normalization separately</strong> <a class="cite" href="#ref-19">[19]</a>: they can change the expected update even on-policy (<a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf">full version</a>, Chapter 8).</li>
+        </ul>
+
+        <section class="references" aria-labelledby="references">
+          <h2 id="references">References</h2>
+          <ol class="ref-list">
+            <li id="ref-1">M. Marek and M. Ryabinin. Score Centering Stabilizes Off-policy Reinforcement Learning. arXiv:2609.20807, 2026.</li>
+            <li id="ref-2">Y. Zhang (Yihua Zhang). Score Function Centering, a series of three blog posts, October 2026. <a href="https://normaluhr.github.io/en/p/score-function-centering/" target="_blank" rel="noreferrer">https://normaluhr.github.io/en/p/score-function-centering/</a></li>
+            <li id="ref-3">Palind. 关于 Score Centering 的五种解释：drift、BPO、理想 baseline、STE、局部分布族 (Five interpretations of score centering). In Chinese. QingKe community (青稞社区), October 13, 2026.</li>
+            <li id="ref-4">Wikipedia. Mean squared error. <a href="https://en.wikipedia.org/wiki/Mean_squared_error" target="_blank" rel="noreferrer">https://en.wikipedia.org/wiki/Mean_squared_error</a></li>
+            <li id="ref-5">Wikipedia. Bias of an estimator. <a href="https://en.wikipedia.org/wiki/Bias_of_an_estimator" target="_blank" rel="noreferrer">https://en.wikipedia.org/wiki/Bias_of_an_estimator</a></li>
+            <li id="ref-6">F. Yao et al. Your Efficient RL Framework Secretly Brings You Off-Policy RL Training. Blog post, August 2025.</li>
+            <li id="ref-7"><a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf">An Error Analysis of Off-Policy LLM RL Updates, Starting from Score-Function Centering</a> (the full version of this post). October 2026.</li>
+            <li id="ref-8">C. Zheng et al. Group Sequence Policy Optimization. arXiv:2507.18071, 2025.</li>
+            <li id="ref-9">J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov. Proximal Policy Optimization Algorithms. arXiv:1707.06347, 2017.</li>
+            <li id="ref-10">R. J. Williams. Simple Statistical Gradient-Following Algorithms for Connectionist Reinforcement Learning. <em>Machine Learning</em>, 8(3–4):229–256, 1992.</li>
+            <li id="ref-11">Z. Shao et al. DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models. arXiv:2402.03300, 2024.</li>
+            <li id="ref-12">W. Kool, H. van Hoof, and M. Welling. Buy 4 REINFORCE Samples, Get a Baseline for Free! ICLR 2019 Workshop on Deep RL Meets Structured Prediction, 2019.</li>
+            <li id="ref-13">A. Ahmadian et al. Back to Basics: Revisiting REINFORCE-Style Optimization for Learning from Human Feedback in LLMs. In <em>ACL</em>, pages 12248–12267, 2024.</li>
+            <li id="ref-14">M. Marek. score-centering: official code. <a href="https://github.com/martin-marek/score-centering" target="_blank" rel="noreferrer">https://github.com/martin-marek/score-centering</a></li>
+            <li id="ref-15">J. Schulman, S. Levine, P. Moritz, M. Jordan, and P. Abbeel. Trust Region Policy Optimization. In <em>ICML</em>, PMLR 37:1889–1897, 2015.</li>
+            <li id="ref-16">Thinking Machines Lab. StableReinforce (<code>stable_reinforce</code>), Tinker documentation, alpha, 2026. <a href="https://tinker-docs.thinkingmachines.ai/tinker/losses/stable-reinforce/" target="_blank" rel="noreferrer">https://tinker-docs.thinkingmachines.ai/tinker/losses/stable-reinforce/</a></li>
+            <li id="ref-17">Ling Team. Every Step Evolves: Scaling Reinforcement Learning for Trillion-Scale Thinking Model. arXiv:2510.18855, 2025. (IcePop.)</li>
+            <li id="ref-18">J. Liu, Y. Li, et al. When Speed Kills Stability: Demystifying RL Collapse from the Training-Inference Mismatch. Blog post, September 2025.</li>
+            <li id="ref-19">Z. Liu et al. Understanding R1-Zero-Like Training: A Critical Perspective. In <em>COLM</em>, 2025.</li>
+          </ol>
+        </section>
+
+        <p class="post-back"><a href="../../#blogs">← Back to homepage</a></p>
+      </div>
+    </article>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <p>Fei Tian · Machine Learning Research</p>
+      <div><a href="https://scholar.google.com/citations?user=SZbCPDEAAAAJ" target="_blank" rel="noreferrer">Scholar</a><a href="https://www.linkedin.com/in/fei-tian-ustc-ml" target="_blank" rel="noreferrer">LinkedIn</a></div>
+    </div>
+  </footer>
+
+  <!-- Cloudflare Web Analytics -->
+  <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"fc04a46edad14ccebbbe4f9968b90908"}'></script>
+  <!-- End Cloudflare Web Analytics -->
+</body>
+</html>
