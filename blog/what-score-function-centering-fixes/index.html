@@ -59,7 +59,7 @@
 
       <div class="post-body">
         <aside class="full-version-note">
-          <p>If you have time, you are strongly encouraged to read the <a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf"><strong>full version</strong></a> (PDF, 65 pages). It has the derivations, the general form of each result below, and the methods this post leaves out.</p>
+          <p>If you have time, you are strongly encouraged to read the <a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf"><strong>full version</strong></a>. It has the derivations, the general form of each result below, and the methods this post leaves out.</p>
         </aside>
 
         <p>In September 2026, Together AI proposed <em>score centering</em> for off-policy RL of language models <a class="cite" href="#ref-1">[1]</a>. At every prefix, it subtracts from the trainer’s score its average under the sampler, the policy that generated the data. In their implementation it adds one term to the loss and less than \(1\%\) to the wall-clock time, and it gives strong results in their experiments. <strong>As far as we know, the same correction is already common in large-scale RL recipes at frontier labs, under names such as “<em>score function centering</em>”, “<em>alternative tokens</em>”, and “<em>covariance learning</em>”.</strong> Following Zhang <a class="cite" href="#ref-2">[2]</a>, we call it SFC.</p>
