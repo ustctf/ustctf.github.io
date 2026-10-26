@@ -93,8 +93,8 @@ h2 { margin: 0; font-family: var(--serif); font-size: clamp(2rem, 4vw, 3rem); li
 .blogs-intro { max-width: 890px; margin: 0 0 24px; }
 .blog-entry { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; padding: 20px 0 0; border-top: 1px solid var(--soft-line); }
 .blog-entry h3 { margin: 0 0 6px; font-family: var(--serif); font-size: 19px; line-height: 1.35; }
-.blog-entry h3 a { color: #17191c; text-decoration: none; }
-.blog-entry h3 a:hover { color: var(--blue); text-decoration: underline; }
+.blog-entry h3 a { color: #17191c; text-decoration: underline; text-decoration-color: var(--blue); text-decoration-thickness: 1.5px; text-underline-offset: 5px; }
+.blog-entry h3 a:hover { color: var(--blue); text-decoration-color: var(--blue); }
 .blog-entry p { max-width: 760px; margin: 0; }
 .blog-entry .plain-enumeration { max-width: 760px; margin: 8px 0 10px; }
 .blog-entry .plain-enumeration li { margin-bottom: 6px; }
