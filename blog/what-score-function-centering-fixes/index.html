@@ -8,9 +8,10 @@
   <title>What Score-Function Centering Fixes, and What It Leaves · Fei Tian</title>
   <link rel="stylesheet" href="../../styles.css?v=20261025">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
-  <link rel="stylesheet" href="../blog.css?v=20261025b">
+  <link rel="stylesheet" href="../blog.css?v=20261027">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous"></script>
+  <script defer src="../toc.js?v=20261027"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       renderMathInElement(document.querySelector('.post-body'), {
@@ -57,6 +58,11 @@
         <p class="post-meta">Fei Tian with Claude<span class="sep">·</span>October 2026<span class="sep">·</span><a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf">full version (PDF, 65 pages)</a></p>
       </header>
 
+      <details class="toc" open>
+        <summary class="toc-title">Contents</summary>
+        <ul class="toc-list"></ul>
+      </details>
+
       <div class="post-body">
         <aside class="full-version-note">
           <p>If you have time, you are strongly encouraged to read the <a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf"><strong>full version</strong></a>. It has the derivations, the general form of each result below, and the methods this post leaves out.</p>
@@ -83,7 +89,7 @@
 
         <h2 id="sec-setup"><span class="secno">1</span>Setup</h2>
         <p>The <strong>sampler</strong> \(q\) generates the data, and the <strong>trainer</strong> \(p = p_\theta\) is the policy being updated. They differ because of engine mismatch (quantization, different kernels), staleness (asynchronous training), or sampling settings (temperature, top-\(k\)). At a prefix \(s\), the trainer has logits \(z(s, v)\), and the score of token \(v\) is</p>
-        <div id="eq-score">
+        <div id="eq-score" class="eq-wide">
           \[g(s, v) \;=\; \grad\log p(v \mid s) \;=\; \grad z(s, v) - m_p(s), \qquad m_\pi(s) \;=\; \sum_v \pi(v \mid s)\,\grad z(s, v) .\tag{2}\]
         </div>
         <p>The goal is the gradient \(\grad J\) of the trainer’s expected reward. REINFORCE <a class="cite" href="#ref-10">[10]</a> multiplies each token’s score by \(R - b\), where \(R\) is the reward and \(b\) a baseline that does not depend on the response itself, such as a fixed value or the mean reward of the other responses (RLOO <a class="cite" href="#ref-12">[12, 13]</a>); GRPO’s group mean <a class="cite" href="#ref-11">[11]</a> includes the response itself (<a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf">full version</a>, Chapter 8). We write \(Q^q(s, v)\) for the expected reward after choosing \(v\) and letting the sampler finish, \(V^q(s) = \sum_v q(v \mid s)\,Q^q(s, v)\) for the value of the prefix, and \(\Aq = Q^q - V^q\) for the advantage.</p>

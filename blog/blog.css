@@ -2,6 +2,8 @@
    header, footer, colors and fonts shared with the homepage. */
 :root {
   --post-width: 720px;
+  --toc-width: 210px;
+  --toc-gap: 48px;
   --box-bg: #f4f4f1;
   --box-line: #c3c2b7;
   --ink-a: #2a78d6;
@@ -9,7 +11,19 @@
   --ink-c: #1baf7a;
 }
 
-.post { width: min(var(--post-width), calc(100% - 44px)); margin: 0 auto; padding: 58px 0 64px; }
+/* The post is a grid: header, table of contents, body. On wide screens the
+   table of contents moves into a sticky column to the right of the text. */
+.post {
+  display: grid;
+  grid-template-columns: minmax(0, var(--post-width));
+  grid-template-areas: "header" "toc" "body";
+  justify-content: center;
+  width: calc(100% - 44px);
+  margin: 0 auto;
+  padding: 58px 0 64px;
+}
+.post-header { grid-area: header; }
+.post-body { grid-area: body; min-width: 0; }
 
 .post-header { margin-bottom: 38px; padding-bottom: 26px; border-bottom: 1px solid var(--line); }
 .post-header h1 { font-size: clamp(2.1rem, 5vw, 2.9rem); line-height: 1.12; }
@@ -35,6 +49,11 @@
 .eq-tag { position: absolute; top: 50%; right: 0; transform: translateY(-50%); font-family: KaTeX_Main, "Times New Roman", serif; font-size: 1.2em; }
 
 .eq-key { margin: 1.4em auto; padding-top: 0.5em; padding-bottom: 0.5em; border: 1px solid var(--box-line); border-radius: 4px; background: var(--white); }
+/* A display equation nearly as wide as the column: on screens with side
+   margins, let it bleed into them so the \tag keeps clear of the equation. */
+@media (min-width: 860px) {
+  .eq-wide .katex-display { margin-left: -2.5em; margin-right: -2.5em; }
+}
 
 /* Lists */
 .post-list { margin: 0.2em 0 1.2em; padding-left: 1.6em; }
@@ -92,6 +111,38 @@
 .footnotes a { overflow-wrap: anywhere; }
 .post-body .post-back { margin-top: 2.4em; font-size: 14px; font-weight: 600; }
 .post-body .post-back a { text-decoration: none; }
+
+/* Table of contents (built by toc.js). Below the breakpoint it is a
+   collapsible box under the post header; from the breakpoint up it is a
+   sticky sidebar. The breakpoint must match toc.js. */
+.toc { grid-area: toc; font-size: 13px; line-height: 1.45; }
+.toc:not(.is-ready) { display: none; }
+.toc-title { display: flex; align-items: center; gap: 9px; margin: 0; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; list-style: none; }
+.toc-title::-webkit-details-marker { display: none; }
+.toc-title::before { content: ""; width: 6px; height: 6px; margin: 0 2px 2px 1px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform 0.15s; }
+.toc[open] .toc-title::before { margin-bottom: 4px; transform: rotate(45deg); }
+.toc-list, .toc-list ul { margin: 0; padding: 0; list-style: none; }
+.toc-list { margin-top: 12px; border-left: 1px solid var(--line); }
+.toc-list a { display: block; margin-left: -1px; padding: 3px 0 3px 14px; border-left: 2px solid transparent; color: var(--muted); text-decoration: none; }
+.toc-list a:hover { color: var(--blue); }
+.toc-list a.is-active { border-left-color: var(--blue); color: #17191c; font-weight: 600; }
+.toc-list ul a { padding-left: 28px; font-size: 12.5px; }
+
+@media (max-width: 999px) {
+  .toc { margin: -10px 0 34px; padding: 11px 16px; border: 1px solid var(--box-line); border-radius: 4px; background: var(--box-bg); }
+  .toc[open] { padding-bottom: 14px; }
+}
+
+@media (min-width: 1000px) {
+  .post { grid-template-columns: minmax(0, var(--post-width)) var(--toc-width); grid-template-areas: "header ." "body toc"; column-gap: var(--toc-gap); }
+  .toc { position: sticky; top: 88px; align-self: start; max-height: calc(100vh - 112px); overflow-y: auto; scrollbar-width: thin; }
+  .toc-title { pointer-events: none; }
+  .toc-title::before { display: none; }
+}
+
+@media print {
+  .toc { display: none; }
+}
 
 :target { scroll-margin-top: 80px; }
 

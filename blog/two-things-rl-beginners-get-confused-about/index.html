@@ -8,9 +8,10 @@
   <title>Two Things RL Beginners Get Confused About · Fei Tian</title>
   <link rel="stylesheet" href="../../styles.css?v=20261014">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
-  <link rel="stylesheet" href="../blog.css?v=20261017b">
+  <link rel="stylesheet" href="../blog.css?v=20261027">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous"></script>
+  <script defer src="../toc.js?v=20261027"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       renderMathInElement(document.querySelector('.post-body'), {
@@ -54,6 +55,11 @@
         <p class="post-subtitle">and the one fact that clears up both</p>
         <p class="post-meta">Fei Tian with Claude<span class="sep">·</span>September 2026<!-- <span class="sep">·</span><a href="FULL-VERSION-URL">full version with all derivations</a> --></p>
       </header>
+
+      <details class="toc" open>
+        <summary class="toc-title">Contents</summary>
+        <ul class="toc-list"></ul>
+      </details>
 
       <div class="post-body">
         <p>Over the past few months I have had a lot of technical discussions with colleagues who are ramping up on RL for LLM post-training. Most of them come from a supervised-learning background, and two comments from those conversations stuck with me, because each one is correct about the math on the page and still leads to the wrong picture of what RL does. Since they are probably common among people new to RL, I am writing them down here.</p>
@@ -112,7 +118,7 @@
         </ol>
         <p>Steps 1 and 2 are the math; Steps 3 and 4 are what the math means.</p>
 
-        <h3>Step 1: per sample, the comment is right</h3>
+        <h3 id="step-1">Step 1: per sample, the comment is right</h3>
         <p>Take one sampled answer \(y\) and differentiate its term in each loss:</p>
         <div class="eq-pair">
           \[\nabla_\theta\big[-\log\pi_\theta(y)\big]=-\nabla_\theta\log\pi_\theta(y),\]
@@ -120,7 +126,7 @@
         </div>
         <p>Same vector, scaled by \(R(y)\). The RL update pushes up the log-probability of the sampled answer exactly as SFT pushes up the log-probability of a label, only harder or softer depending on the reward. <strong>At the level of a single sample, Comment 1 is simply correct.</strong></p>
 
-        <h3>Step 2: a loss is an average, and the averages run over different things</h3>
+        <h3 id="step-2">Step 2: a loss is an average, and the averages run over different things</h3>
         <p>But nobody trains on one sample. The loss is an average over a batch, in the limit an expectation, so the gradient that actually moves the parameters is</p>
         <div class="eq-pair">
           \[\nabla J_{\mathrm{SFT}}=\E_{y\sim p}\big[\nabla\log\pi_\theta(y)\big],\]
@@ -143,7 +149,7 @@
         \[\dot\theta_k=\operatorname{Cov}_{a\sim\pi}\big(\mathbf 1[a=k],\,R(a)\big)=\pi_kR_k-\pi_k\bar R,\]
         <p>so the logit of answer \(k\) moves by how much “the answer was \(k\)” covaries with “the reward was high.” That covariance is zero when \(k\) is never sampled and zero when \(k\)’s reward equals the average, which are the two ways the rule can stop. And a covariance ignores constant shifts: replacing \(R\) by \(R-b\) for any baseline \(b\) leaves the expected update unchanged, which is why \(\bar R\) showed up on its own and why Part 2 can use an advantage in place of the reward.</p>
 
-        <h3>Step 3: reading the two rules</h3>
+        <h3 id="step-3">Step 3: reading the two rules</h3>
         <p>The SFT rule says: move each logit toward its target, with a force equal to the gap between where the probability is and where it should be. An answer the model never produces but the demonstrations contain gets a full-size push. <strong>SFT can put mass where there is none.</strong></p>
         <p>The RL rule says: move each logit in proportion to two things, how much better than average the answer is (\(R_k-\bar R\)) and how likely the model already is to produce it (\(\pi_k\)). A rare answer barely moves, no matter how good it is; a common answer moves fast. <strong>RL can only redistribute mass among answers it already produces.</strong> It is a rich-get-richer rule.</p>
         <p>Where does each rule come to rest? A rule stops when every \(\dot\theta_k\) is zero.</p>
@@ -153,7 +159,7 @@
         </ul>
         <p><strong>SFT ends by matching a distribution; RL ends by committing to the best answer.</strong></p>
 
-        <h3>Step 4: the path, not just the endpoint</h3>
+        <h3 id="step-4">Step 4: the path, not just the endpoint</h3>
         <p>Step 3 said where each rule ends. The path to the endpoint matters just as much, because the RL rule makes the path depend on where the model starts. <a href="#fig-dynamics">Figure 1</a> runs both rules from the base model \((0.1,0.6,0.3)\) with a small step size and plots the three probabilities over time.</p>
         <ul class="post-list">
           <li><strong>Left, SFT:</strong> settles at the demos, A and B half each. Nothing surprising.</li>
