@@ -55,7 +55,7 @@
       <header class="post-header">
         <h1>What Score-Function Centering Fixes, and What It Leaves</h1>
         <p class="post-subtitle">A bias–variance view of off-policy LLM RL updates</p>
-        <p class="post-meta">Fei Tian with Claude<span class="sep">·</span>October 2026<span class="sep">·</span><a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf">full version (PDF, 65 pages)</a></p>
+        <p class="post-meta">Fei Tian with Claude<span class="sep">·</span>October 2026<span class="sep">·</span><a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf?v=20261027">full version (PDF, 65 pages)</a></p>
       </header>
 
       <details class="toc" open>
@@ -65,7 +65,7 @@
 
       <div class="post-body">
         <aside class="full-version-note">
-          <p>If you have time, you are strongly encouraged to read the <a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf"><strong>full version</strong></a>. It has the derivations, the general form of each result below, and the methods this post leaves out.</p>
+          <p>If you have time, you are strongly encouraged to read the <a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf?v=20261027"><strong>full version</strong></a>. It has the derivations, the general form of each result below, and the methods this post leaves out.</p>
         </aside>
 
         <p>In September 2026, Together AI proposed <em>score centering</em> for off-policy RL of language models <a class="cite" href="#ref-1">[1]</a>. At every prefix, it subtracts from the trainer’s score its average under the sampler, the policy that generated the data. In their implementation it adds one term to the loss and less than \(1\%\) to the wall-clock time, and it gives strong results in their experiments. <strong>As far as we know, the same correction is already common in large-scale RL recipes at frontier labs, under names such as “<em>score function centering</em>”, “<em>alternative tokens</em>”, and “<em>covariance learning</em>”.</strong> Following Zhang <a class="cite" href="#ref-2">[2]</a>, we call it SFC.</p>
@@ -85,14 +85,14 @@
           <li><strong>Variance</strong> (<a href="#sec-variance">Section 4</a>). Importance sampling (IS) without truncation removes drift and the first of these biases, but in many settings, especially fully asynchronous RL with large staleness, its variance is much larger than SFC’s. Truncated importance sampling (TIS) <a class="cite" href="#ref-6">[6]</a> caps the ratio to control large weights, which brings bias back.</li>
           <li><strong>Total error</strong> (<a href="#sec-tis">Section 5</a>). Combining the two, TIS + centering (weight with the truncated ratio, then center as SFC does) can give a better trade-off than either alone; in a toy model it is most often the best at a moderate lag and a middle range of sample sizes.</li>
         </ol>
-        <p>A <a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf">longer companion note</a> <a class="cite" href="#ref-7">[7]</a> has the derivations, the general version of each result, and other methods such as GSPO <a class="cite" href="#ref-8">[8]</a>, length-weighted baselines, and PPO’s clipping <a class="cite" href="#ref-9">[9]</a>.</p>
+        <p>A <a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf?v=20261027">longer companion note</a> <a class="cite" href="#ref-7">[7]</a> has the derivations, the general version of each result, and other methods such as GSPO <a class="cite" href="#ref-8">[8]</a>, length-weighted baselines, and PPO’s clipping <a class="cite" href="#ref-9">[9]</a>.</p>
 
         <h2 id="sec-setup"><span class="secno">1</span>Setup</h2>
         <p>The <strong>sampler</strong> \(q\) generates the data, and the <strong>trainer</strong> \(p = p_\theta\) is the policy being updated. They differ because of engine mismatch (quantization, different kernels), staleness (asynchronous training), or sampling settings (temperature, top-\(k\)). At a prefix \(s\), the trainer has logits \(z(s, v)\), and the score of token \(v\) is</p>
         <div id="eq-score" class="eq-wide">
           \[g(s, v) \;=\; \grad\log p(v \mid s) \;=\; \grad z(s, v) - m_p(s), \qquad m_\pi(s) \;=\; \sum_v \pi(v \mid s)\,\grad z(s, v) .\tag{2}\]
         </div>
-        <p>The goal is the gradient \(\grad J\) of the trainer’s expected reward. REINFORCE <a class="cite" href="#ref-10">[10]</a> multiplies each token’s score by \(R - b\), where \(R\) is the reward and \(b\) a baseline that does not depend on the response itself, such as a fixed value or the mean reward of the other responses (RLOO <a class="cite" href="#ref-12">[12, 13]</a>); GRPO’s group mean <a class="cite" href="#ref-11">[11]</a> includes the response itself (<a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf">full version</a>, Chapter 8). We write \(Q^q(s, v)\) for the expected reward after choosing \(v\) and letting the sampler finish, \(V^q(s) = \sum_v q(v \mid s)\,Q^q(s, v)\) for the value of the prefix, and \(\Aq = Q^q - V^q\) for the advantage.</p>
+        <p>The goal is the gradient \(\grad J\) of the trainer’s expected reward. REINFORCE <a class="cite" href="#ref-10">[10]</a> multiplies each token’s score by \(R - b\), where \(R\) is the reward and \(b\) a baseline that does not depend on the response itself, such as a fixed value or the mean reward of the other responses (RLOO <a class="cite" href="#ref-12">[12, 13]</a>); GRPO’s group mean <a class="cite" href="#ref-11">[11]</a> includes the response itself (<a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf?v=20261027">full version</a>, Chapter 8). We write \(Q^q(s, v)\) for the expected reward after choosing \(v\) and letting the sampler finish, \(V^q(s) = \sum_v q(v \mid s)\,Q^q(s, v)\) for the value of the prefix, and \(\Aq = Q^q - V^q\) for the advantage.</p>
 
         <h2 id="sec-drift"><span class="secno">2</span>The bias SFC removes: drift from the baseline’s error</h2>
         <p>On-policy, the score averages to zero, \(\E_p[g] = \sum_v \grad p(v) = 0\), so a baseline cannot change the expected update. Off-policy, the tokens come from \(q\), and \(\E_q[g] = m_q - m_p\) is in general not zero. To see what this does, fix a prefix \(s\) and average over the next token \(v \sim q\) and the sampler’s continuation. The baseline does not depend on the response, so token \(v\) is multiplied on average by \(Q^q(s, v) - \E[b \mid s]\). Writing \(Q^q = \Aq + V^q\) and using \(\sum_v q(v)\,g(s, v) = m_q(s) - m_p(s)\),</p>
@@ -227,7 +227,7 @@
         <p>Both gaps vanish when \(p = q\), and bounds on them tighten as the two policies get closer:</p>
         <ul class="post-list">
           <li><strong>B.</strong> At a prefix, \(\Cov_q(\Aq, \grad z) - \Cov_p(\Aq, \grad z) = \sum_v \big(q(v) - p(v)\big)\,\Aq(v)\,g(v)\), a sum weighted by \(q - p\), so by Pinsker’s inequality its length is at most \(\max_v\|\Aq(v)\,g(v)\|\,\sum_v|q(v) - p(v)| \le \max_v\|\Aq(v)\,g(v)\|\,\sqrt{2\,\KL(q\,\|\,p)}\) <a class="cite" href="#ref-2">[2]</a>.</li>
-          <li><strong>C.</strong> In the objective, the matching gap is second order in the total variation between the policies (the TRPO bound <a class="cite" href="#ref-15">[15]</a>); in the gradient it is first order, and it grows with the length of the response (<a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf">full version</a>, Chapters 7 and 11).</li>
+          <li><strong>C.</strong> In the objective, the matching gap is second order in the total variation between the policies (the TRPO bound <a class="cite" href="#ref-15">[15]</a>); in the gradient it is first order, and it grows with the length of the response (<a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf?v=20261027">full version</a>, Chapters 7 and 11).</li>
         </ul>
         <p>So limiting the age of samples, or adding a KL penalty toward the sampler as Zhang <a class="cite" href="#ref-2">[2]</a> and Tinker’s StableReinforce loss <a class="cite" href="#ref-16">[16]</a> do, <strong>helps keep both gaps small, though it removes neither</strong>; how small also depends on the length of the response and the size of the advantages.</p>
         <p>One caveat: suppose you deploy the inference engine itself, its logits are the trainer’s plus an error that does not change with \(\theta\), the rollouts come from the current parameters, and the center is exact. Then \(h = \grad\log q_\theta\), SFC is the exact gradient for what you deploy, and B and C are not errors. Under staleness the target is the trainer, and both gaps are real.</p>
@@ -267,7 +267,7 @@
           \end{aligned}\tag{9}\]
         </div>
         <p>where the second line again uses \(\sum_v q(v)\,\Aq(s, v) = 0\), now to drop the constant \(\E_q[\wt\,g]\). So drift is gone; tokens whose ratio is below the cap get the trainer’s weight exactly, and the others are corrected partly. The order matters: centering first and then multiplying by \(r\) gives \(\E_q[r\,h] = m_p - m_q \neq 0\), which is drift with the opposite sign.</p>
-        <p>Capping also lowers the total weight to \(Z = \sum_v \min\big(p(v), \bar r\,q(v)\big) \le 1\), which acts like a smaller step at this prefix. To compare directions and noise rather than step sizes, the comparisons below use \(f/Z\), so that all three methods have total weight \(1\). Without this rescaling, TIS + centering does even better with few samples, partly only because its steps are shorter (<a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf">full version</a>, Subsection 9.6).</p>
+        <p>Capping also lowers the total weight to \(Z = \sum_v \min\big(p(v), \bar r\,q(v)\big) \le 1\), which acts like a smaller step at this prefix. To compare directions and noise rather than step sizes, the comparisons below use \(f/Z\), so that all three methods have total weight \(1\). Without this rescaling, TIS + centering does even better with few samples, partly only because its steps are shorter (<a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf?v=20261027">full version</a>, Subsection 9.6).</p>
 
         <h3 id="sec-mseprefix"><span class="secno">5.2</span>The total error at one prefix</h3>
         <p>To write Eq. <a href="#eq-mse">(1)</a> for these estimators, we simplify in two ways.</p>
@@ -296,7 +296,7 @@
         <p>In Example 2, with deterministic returns and \(b = V^q\), SFC has squared bias \(0.0074\) and single-sample variance \(0.102\), and exact IS has no bias and variance \(0.273\), so SFC has the lower total error below about \(23\) samples and exact IS above.</p>
 
         <h3 id="sec-regime"><span class="secno">5.3</span>Which method has the lowest total error</h3>
-        <p>To see how the terms of Eq. <a href="#eq-mseprefix">(10)</a> compare, we use random problems with 20 tokens in which a parameter \(\kappa\) sets the lag between trainer and sampler (<a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf">full version</a>, Subsection 9.6). There, at a moderate lag, TIS + centering removes half or more of B at less variance than exact IS, and at a very large lag it gains little. <a href="#tab-regime">Table 1</a> adds the two terms.</p>
+        <p>To see how the terms of Eq. <a href="#eq-mseprefix">(10)</a> compare, we use random problems with 20 tokens in which a parameter \(\kappa\) sets the lag between trainer and sampler (<a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf?v=20261027">full version</a>, Subsection 9.6). There, at a moderate lag, TIS + centering removes half or more of B at less variance than exact IS, and at a very large lag it gains little. <a href="#tab-regime">Table 1</a> adds the two terms.</p>
 
         <div class="table-wrap" id="tab-regime">
           <table class="regime">
@@ -329,7 +329,7 @@
           <li><strong>Use SFC</strong> with auxiliary tokens drawn independently of the main sample, or with a logged top-\(k\) head (approximate in the tail), and compute \(q\) with the sampler’s actual temperature and truncation.</li>
           <li><strong>With TIS or MIS, weight first and then center</strong> (TIS + centering), and write the loss with log-probabilities rather than logits.</li>
           <li><strong>Keep \(p\) close to \(q\)</strong> with a limit on sample age or a KL penalty toward the sampler, and add TIS + centering when the lag is moderate.</li>
-          <li><strong>Check GRPO-style length and standard-deviation normalization separately</strong> <a class="cite" href="#ref-19">[19]</a>: they can change the expected update even on-policy (<a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf">full version</a>, Chapter 8).</li>
+          <li><strong>Check GRPO-style length and standard-deviation normalization separately</strong> <a class="cite" href="#ref-19">[19]</a>: they can change the expected update even on-policy (<a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf?v=20261027">full version</a>, Chapter 8).</li>
         </ul>
 
         <section class="references" aria-labelledby="references">
@@ -341,7 +341,7 @@
             <li id="ref-4">Wikipedia. Mean squared error. <a href="https://en.wikipedia.org/wiki/Mean_squared_error" target="_blank" rel="noreferrer">https://en.wikipedia.org/wiki/Mean_squared_error</a></li>
             <li id="ref-5">Wikipedia. Bias of an estimator. <a href="https://en.wikipedia.org/wiki/Bias_of_an_estimator" target="_blank" rel="noreferrer">https://en.wikipedia.org/wiki/Bias_of_an_estimator</a></li>
             <li id="ref-6">F. Yao et al. Your Efficient RL Framework Secretly Brings You Off-Policy RL Training. Blog post, August 2025.</li>
-            <li id="ref-7"><a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf">An Error Analysis of Off-Policy LLM RL Updates, Starting from Score-Function Centering</a> (the full version of this post). October 2026.</li>
+            <li id="ref-7"><a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf?v=20261027">An Error Analysis of Off-Policy LLM RL Updates, Starting from Score-Function Centering</a> (the full version of this post). October 2026.</li>
             <li id="ref-8">C. Zheng et al. Group Sequence Policy Optimization. arXiv:2507.18071, 2025.</li>
             <li id="ref-9">J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov. Proximal Policy Optimization Algorithms. arXiv:1707.06347, 2017.</li>
             <li id="ref-10">R. J. Williams. Simple Statistical Gradient-Following Algorithms for Connectionist Reinforcement Learning. <em>Machine Learning</em>, 8(3–4):229–256, 1992.</li>
