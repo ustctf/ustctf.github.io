@@ -95,20 +95,31 @@
         <p>The goal is the gradient \(\grad J\) of the trainer’s expected reward. REINFORCE <a class="cite" href="#ref-10">[10]</a> multiplies each token’s score by \(R - b\), where \(R\) is the reward and \(b\) a baseline that does not depend on the response itself, such as a fixed value or the mean reward of the other responses (RLOO <a class="cite" href="#ref-12">[12, 13]</a>); GRPO’s group mean <a class="cite" href="#ref-11">[11]</a> includes the response itself (<a href="An_Error_Analysis_of_Off-Policy_LLM_RL_Updates.pdf?v=20261027">full version</a>, Chapter 8). We write \(Q^q(s, v)\) for the expected reward after choosing \(v\) and letting the sampler finish, \(V^q(s) = \sum_v q(v \mid s)\,Q^q(s, v)\) for the value of the prefix, and \(\Aq = Q^q - V^q\) for the advantage.</p>
 
         <h2 id="sec-drift"><span class="secno">2</span>The bias SFC removes: drift from the baseline’s error</h2>
-        <p>On-policy, the score averages to zero, \(\E_p[g] = \sum_v \grad p(v) = 0\), so a baseline cannot change the expected update. Off-policy, the tokens come from \(q\), and \(\E_q[g] = m_q - m_p\) is in general not zero. To see what this does, fix a prefix \(s\) and average over the next token \(v \sim q\) and the sampler’s continuation. The baseline does not depend on the response, so token \(v\) is multiplied on average by \(Q^q(s, v) - \E[b \mid s]\). Writing \(Q^q = \Aq + V^q\) and using \(\sum_v q(v)\,g(s, v) = m_q(s) - m_p(s)\),</p>
+        <p>On-policy, the score averages to zero, \(\E_p[g] = \sum_v \grad p(v) = 0\), so a baseline cannot change the expected update. Off-policy, the tokens come from \(q\), and \(\E_q[g] = m_q - m_p\) is in general not zero. To see what this does, fix a prefix \(s\) and average over the next token \(v \sim q\), the sampler’s continuation, and the baseline. First split the multiplier into three parts:</p>
+        \[R - b \;=\; \underbrace{R - Q^q(s, v)}_{\text{noise}} \;+\; \underbrace{Q^q(s, v) - V^q(s)}_{\text{advantage } \Aq(s, v)} \;+\; \underbrace{V^q(s) - b}_{\text{baseline’s error}} .\]
+        <p>Multiply each part by the score \(g = g(s, v)\) and average:</p>
+        <ul class="post-list">
+          <li><strong>The noise averages to zero.</strong> Once \(v\) is chosen, \(g(s, v)\) is fixed and the sampler finishes the response, so by definition \(\E[R \mid s, v] = Q^q(s, v)\): \(\E[(R - Q^q)\,g \mid s] = \sum_v q(v)\,g(s, v)\,\E[R - Q^q(s, v) \mid s, v] = 0\). It adds only variance (<a href="#sec-variance">Section 4</a>).</li>
+          <li><strong>The advantage gives</strong> \(\E[\Aq\,g \mid s] = \sum_v q(v)\,\Aq(s, v)\,g(s, v)\).</li>
+          <li><strong>The baseline’s error factorizes.</strong> Given \(s\), \(V^q(s)\) is a constant, and \(b\) does not depend on the response, so it is independent of \(v\): \(\E[(V^q - b)\,g \mid s] = \big(V^q(s) - \E[b \mid s]\big)\,\E_q[g]\), with \(\E_q[g] = \sum_v q(v)\,g(s, v) = m_q(s) - m_p(s)\).</li>
+        </ul>
+        <p>Adding the three parts,</p>
         <div id="eq-split">
           \[\begin{aligned}
           \E\big[(R - b)\,g \,\big|\, s\big]
-          &= \sum_v q(v)\,\big(Q^q(s, v) - \E[b \mid s]\big)\,g(s, v) \\
-          &= \sum_v q(v)\,\big(\Aq(s, v) + V^q(s) - \E[b \mid s]\big)\,g(s, v) \\
-          &= \underbrace{\sum_v q(v)\,\Aq(s, v)\,g(s, v)}_{\text{signal}}
-          \;+\; \underbrace{\big(V^q(s) - \E[b \mid s]\big)\big(m_q(s) - m_p(s)\big)}_{\text{drift}} .
+          &= \underbrace{\sum_v q(v)\,\Aq(s, v)\,g(s, v)}_{\text{signal}} \\
+          &\qquad\;+\; \underbrace{\big(V^q(s) - \E[b \mid s]\big)\big(m_q(s) - m_p(s)\big)}_{\text{drift}} .
           \end{aligned}\tag{3}\]
         </div>
         <p>The two terms play very different roles:</p>
         <ul class="post-list">
           <li><strong>Signal.</strong> This is the term we want to keep. It has the form of the ordinary policy gradient, an advantage-weighted average of the score, but with the sampler’s advantage \(\Aq\) and token probabilities, so it is not yet the trainer’s policy gradient (<a href="#sec-gaps">Section 3</a> measures the difference).</li>
-          <li><strong>Drift.</strong> This is the problem. Its first factor, \(V^q(s) - \E[b \mid s]\), is the gap between the expected baseline and the value of the current prefix, which is the ideal baseline here. The baseline is often computed from other responses to the same prompt, so it can be random (hence its conditional mean), and even an accurate prompt-level baseline can be far from the value of the current prefix. The second factor is the mean of the score under the sampler, which is zero on-policy, so there this gap does no harm. <strong>Off-policy the second factor is in general not zero, so the baseline, added to reduce variance, now brings in bias.</strong></li>
+          <li><strong>Drift.</strong> This is the problem, and it is a product of two factors:
+            <ul class="post-list">
+              <li><strong>The first factor</strong>, \(V^q(s) - \E[b \mid s]\), is the gap between the expected baseline and the value of the current prefix, which is the ideal baseline here. The baseline is often computed from other responses to the same prompt, so it can be random (hence its conditional mean), and even an accurate prompt-level baseline can be far from the value of the current prefix.</li>
+              <li><strong>The second factor</strong>, \(m_q(s) - m_p(s)\), is the mean of the score under the sampler. It is zero on-policy, so there the gap does no harm. <strong>Off-policy it is in general not zero, so the baseline, added to reduce variance, now brings in bias.</strong></li>
+            </ul>
+          </li>
         </ul>
 
         <aside class="takeaway example">
